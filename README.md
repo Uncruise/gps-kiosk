@@ -4,15 +4,20 @@ A containerized marine navigation kiosk built on Signal K technology, designed f
 
 ## 🚀 Quick Start
 
-### For End Users (Recommended)
+### For Windows Users
 
-1. **Download and run**: `setup.bat`
+1. **Download and run**: `Windows/setup.bat`
 2. **Done!** The system will auto-install Docker, pull latest images, and launch in kiosk mode
+
+### For Linux/Unix Users
+
+1. **Download and run**: `unix/setup.sh`
+2. **Or use direct download**: `unix/download.sh` (no Git required)
 
 ### For IT Deployment
 
-1. **Intune Packages**: Use files in `intune_out/` folder
-2. **Direct Download**: Use `download.bat` for non-Git environments
+1. **Intune Packages**: Use files in `intune_out/` folder (Windows only)
+2. **Direct Download**: Use `Windows/download.bat` (Windows) or `unix/download.sh` (Linux) for non-Git environments
 
 ## 🎯 What It Does
 
@@ -55,23 +60,35 @@ GPS Kiosk System
 
 ```
 gps-kiosk/
-├── setup.bat                    # Simple setup for end users
-├── quick-setup.ps1             # Advanced PowerShell setup
-├── download.bat                # Git-free download setup
-├── download-setup.ps1          # PowerShell download script
-├── docker-compose.yml          # Container configuration
-├── Dockerfile                  # Custom image build
-├── startup.sh                  # Container startup script
-├── Volume/                     # Signal K configuration
-│   ├── settings.json          # Server settings
-│   ├── security.json          # Security configuration
-│   └── applicationData/       # User data and plugins
-├── intune/                    # Microsoft Intune deployment
-│   ├── install.ps1           # Intune installation script
-│   ├── detection.ps1         # Intune detection script
+├── Windows/                   # Windows scripts and tools
+│   ├── setup.bat              # Simple setup for end users
+│   ├── quick-setup.ps1        # Advanced PowerShell setup
+│   ├── download.bat           # Git-free download setup
+│   ├── download-setup.ps1     # PowerShell download script
+│   ├── configure-*.ps1        # Configuration scripts
+│   ├── docker-diagnostic.ps1  # Diagnostic tools
+│   └── README.md              # Windows-specific documentation
+├── unix/                      # Linux/Unix scripts
+│   ├── setup.sh              # Interactive setup wrapper
+│   ├── quick-setup.sh        # Advanced shell setup
+│   ├── download.sh           # Git-free download setup
+│   ├── download-setup.sh     # Shell download script
+│   ├── configure-*.sh        # Configuration scripts
+│   ├── docker-diagnostic.sh  # Diagnostic tools
+│   └── README.md             # Unix-specific documentation
+├── docker-compose.yml         # Container configuration
+├── Dockerfile                 # Custom image build
+├── startup.sh                 # Container startup script
+├── Volume/                    # Signal K configuration
+│   ├── settings.json         # Server settings
+│   ├── security.json         # Security configuration
+│   └── applicationData/      # User data and plugins
+├── intune/                   # Microsoft Intune deployment
+│   ├── install.ps1          # Intune installation script
+│   ├── detection.ps1        # Intune detection script
 │   └── gps-kiosk-launcher.bat # Intune entry point
-├── docker-intune/            # Docker-only Intune package
-└── intune_out/               # Built Intune packages
+├── docker-intune/           # Docker-only Intune package
+└── intune_out/              # Built Intune packages
     ├── gps-kiosk-launcher.intunewin
     └── docker-installer.intunewin
 ```
@@ -114,28 +131,52 @@ Charts are configured in the Freeboard interface:
 
 ## 🚀 Deployment Options
 
-### 1. Manual Installation
+### 1. Manual Installation (Windows)
+
+```powershell
+# Clone repository
+git clone https://github.com/Uncruise/gps-kiosk.git
+cd gps-kiosk\Windows
+
+# Run setup
+.\setup.bat
+```
+
+### 2. Manual Installation (Linux/Unix)
 
 ```bash
 # Clone repository
 git clone https://github.com/Uncruise/gps-kiosk.git
-cd gps-kiosk
+cd gps-kiosk/unix
 
 # Run setup
-./setup.bat
+sudo bash quick-setup.sh
 ```
 
-### 2. Direct Download (No Git Required)
+### 3. Direct Download (No Git Required)
+
+**Windows:**
+
+```powershell
+.\windows\download.bat
+```
+
+**Linux/Unix:**
 
 ```bash
-# Download and run
-./download.bat
+sudo bash unix/download.sh
 ```
 
-### 3. Enterprise (Microsoft Intune)
+**Windows:**
 
-1. Upload `gps-kiosk-launcher.intunewin` to Intune
-2. Configure detection rule with `detection.ps1`
+```powershell
+# Or manually
+docker compose pull
+docker compose up -d
+```
+
+**Linux/Unix:**
+```bash2. Configure detection rule with `detection.ps1`
 3. Deploy to device groups
 
 ## 🔄 Updates
