@@ -287,12 +287,35 @@ if ($configureAutoLogin -like "y*") {
         $isAdmin = $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
         
         if ($isAdmin) {
+            $resolvedUserName = $username
+            $resolvedDomainName = $env:COMPUTERNAME
+
+            if ($username.StartsWith(".\")) {
+                $resolvedUserName = $username.Substring(2)
+                $resolvedDomainName = $env:COMPUTERNAME
+            } elseif ($username -match "^[^\\]+\\[^\\]+$") {
+                $parts = $username.Split("\\", 2)
+                $resolvedDomainName = $parts[0]
+                $resolvedUserName = $parts[1]
+            } elseif ($username -match "^[^@]+@[^@]+\.[^@]+$") {
+                $resolvedDomainName = "MicrosoftAccount"
+            }
+
             # Configure auto-login registry entries
             $winlogonPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
             Set-ItemProperty -Path $winlogonPath -Name "AutoAdminLogon" -Value "1" -Type String
-            Set-ItemProperty -Path $winlogonPath -Name "DefaultUserName" -Value $username -Type String
+            Set-ItemProperty -Path $winlogonPath -Name "ForceAutoLogon" -Value "1" -Type String
+            Set-ItemProperty -Path $winlogonPath -Name "DefaultUserName" -Value $resolvedUserName -Type String
+            Set-ItemProperty -Path $winlogonPath -Name "DefaultDomainName" -Value $resolvedDomainName -Type String
             Set-ItemProperty -Path $winlogonPath -Name "DefaultPassword" -Value $plainPassword -Type String
-            Set-ItemProperty -Path $winlogonPath -Name "AutoLogonCount" -Value 0 -Type DWord
+            Remove-ItemProperty -Path $winlogonPath -Name "AutoLogonCount" -ErrorAction SilentlyContinue
+
+            $systemPolicyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
+            if (-not (Test-Path $systemPolicyPath)) {
+                New-Item -Path $systemPolicyPath -Force | Out-Null
+            }
+            Set-ItemProperty -Path $systemPolicyPath -Name "DisableCAD" -Value 1 -Type DWord
+            Set-ItemProperty -Path $systemPolicyPath -Name "DontDisplayLastUserName" -Value 0 -Type DWord
             
             # Disable lock screen
             $personalizationPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization"
@@ -307,7 +330,7 @@ if ($configureAutoLogin -like "y*") {
             Start-Process "powercfg" -ArgumentList "/change", "hibernate-timeout-ac", "0" -Wait -NoNewWindow
             
             Write-Host "Auto-login configured successfully!" -ForegroundColor Green
-            Write-Host "  ✅ Auto-login enabled for: $username" -ForegroundColor White
+            Write-Host "  ✅ Auto-login enabled for: $resolvedDomainName\$resolvedUserName" -ForegroundColor White
             Write-Host "  ✅ Lock screen disabled" -ForegroundColor White
             Write-Host "  ✅ Display set to always-on" -ForegroundColor White
             

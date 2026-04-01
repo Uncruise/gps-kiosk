@@ -42,10 +42,14 @@ if ($ShowCurrent) {
     Write-Host "=== Current Auto-Login Configuration ===" -ForegroundColor Yellow
     try {
         $autoLoginUser = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "DefaultUserName" -ErrorAction SilentlyContinue
+        $autoLoginDomain = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "DefaultDomainName" -ErrorAction SilentlyContinue
         $autoLoginEnabled = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "AutoAdminLogon" -ErrorAction SilentlyContinue
+        $forceAutoLogin = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "ForceAutoLogon" -ErrorAction SilentlyContinue
         
         if ($autoLoginEnabled.AutoAdminLogon -eq "1") {
-            Write-Host "Auto-Login: ENABLED for user '$($autoLoginUser.DefaultUserName)'" -ForegroundColor Green
+            $displayName = "$($autoLoginDomain.DefaultDomainName)\$($autoLoginUser.DefaultUserName)"
+            Write-Host "Auto-Login: ENABLED for user '$displayName'" -ForegroundColor Green
+            Write-Host "Force Auto-Login: $($forceAutoLogin.ForceAutoLogon)" -ForegroundColor White
         } else {
             Write-Host "Auto-Login: DISABLED" -ForegroundColor Red
         }
@@ -70,13 +74,39 @@ if ($ShowCurrent) {
 
 Write-Host "Configuring auto-login for user: $Username" -ForegroundColor Yellow
 
+$resolvedUserName = $Username
+$resolvedDomainName = $env:COMPUTERNAME
+
+if ($Username.StartsWith(".\")) {
+    $resolvedUserName = $Username.Substring(2)
+    $resolvedDomainName = $env:COMPUTERNAME
+} elseif ($Username -match "^[^\\]+\\[^\\]+$") {
+    $parts = $Username.Split("\\", 2)
+    $resolvedDomainName = $parts[0]
+    $resolvedUserName = $parts[1]
+} elseif ($Username -match "^[^@]+@[^@]+\.[^@]+$") {
+    $resolvedDomainName = "MicrosoftAccount"
+}
+
+Write-Host "Resolved login identity: $resolvedDomainName\$resolvedUserName" -ForegroundColor Gray
+
 try {
     # Configure auto-login registry entries
     $winlogonPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
     Set-ItemProperty -Path $winlogonPath -Name "AutoAdminLogon" -Value "1" -Type String
-    Set-ItemProperty -Path $winlogonPath -Name "DefaultUserName" -Value $Username -Type String
+    Set-ItemProperty -Path $winlogonPath -Name "ForceAutoLogon" -Value "1" -Type String
+    Set-ItemProperty -Path $winlogonPath -Name "DefaultUserName" -Value $resolvedUserName -Type String
+    Set-ItemProperty -Path $winlogonPath -Name "DefaultDomainName" -Value $resolvedDomainName -Type String
     Set-ItemProperty -Path $winlogonPath -Name "DefaultPassword" -Value $Password -Type String
-    Set-ItemProperty -Path $winlogonPath -Name "AutoLogonCount" -Value 0 -Type DWord
+    Remove-ItemProperty -Path $winlogonPath -Name "AutoLogonCount" -ErrorAction SilentlyContinue
+
+    # Ensure classic logon flow does not block unattended sign-in
+    $systemPolicyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
+    if (-not (Test-Path $systemPolicyPath)) {
+        New-Item -Path $systemPolicyPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $systemPolicyPath -Name "DisableCAD" -Value 1 -Type DWord
+    Set-ItemProperty -Path $systemPolicyPath -Name "DontDisplayLastUserName" -Value 0 -Type DWord
     
     # Disable lock screen
     $personalizationPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization"
@@ -85,7 +115,7 @@ try {
     }
     Set-ItemProperty -Path $personalizationPath -Name "NoLockScreen" -Value 1 -Type DWord
     
-    Write-Host "✅ Auto-login configured for: $Username" -ForegroundColor Green
+    Write-Host "✅ Auto-login configured for: $resolvedDomainName\$resolvedUserName" -ForegroundColor Green
     
 } catch {
     Write-Host "Error configuring auto-login: $($_.Exception.Message)" -ForegroundColor Red

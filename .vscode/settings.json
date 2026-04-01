@@ -22,5 +22,8 @@
             "docker-compose.yml",
             "docker-compose.yaml"
         ]
-    }
+    },
+    "cSpell.words": [
+        "signalk"
+    ]
 }

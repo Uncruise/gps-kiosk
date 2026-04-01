@@ -4,7 +4,28 @@ This directory contains Unix/Linux shell script versions of all the Windows Powe
 
 ## Quick Start
 
-### Automated Setup (Recommended)
+### Ubuntu All-in-One Setup (Recommended for fresh Ubuntu installs)
+
+Run **one script** on a fresh Ubuntu machine and walk away — the system reboots into a
+full-screen GPS Kiosk with no login prompt:
+
+```bash
+sudo bash unix/ubuntu-kiosk-setup.sh --password yourpassword
+```
+
+Defaults: admin user = `gpsadmin`, kiosk user = `gpskiosk`. Override with:
+
+```
+--admin-username   sudo/management user account  (default: gpsadmin)
+--username         auto-login kiosk user account (default: gpskiosk)
+--password         shared password for both accounts (prompted if omitted)
+--gps-host         TCP host for NMEA GPS input (e.g. 192.168.1.100)
+--gps-port         TCP port for NMEA GPS input (e.g. 10110)
+--map-lat          default map latitude
+--map-lon          default map longitude
+```
+
+### Step-by-step Setup (other Linux distros or manual control)
 
 For a fresh installation with Git:
 
@@ -32,6 +53,7 @@ User-friendly wrappers that provide interactive prompts:
 
 ### Setup Scripts
 
+- **ubuntu-kiosk-setup.sh** - **All-in-one Ubuntu kiosk setup**: installs packages, creates user, deploys containers, configures auto-login, patches systemd service with `$DISPLAY`, disables screen blanking and sleep. Run once; reboot into kiosk.
 - **quick-setup.sh** - Fully automated installation with Docker auto-install, repository cloning, and startup configuration
 - **download-setup.sh** - Downloads GPS Kiosk from GitHub without requiring Git installation
 - **configure-auto-login.sh** - Configures Linux for automatic login and kiosk mode operation
