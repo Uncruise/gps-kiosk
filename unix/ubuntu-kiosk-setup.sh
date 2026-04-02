@@ -127,6 +127,16 @@ fi
 systemctl enable docker
 systemctl start docker
 
+# Install ScreenConnect remote support client if the .deb is present in tools/
+SCREENCONNECT_DEB="$SCRIPT_DIR/../tools/ScreenConnect.ClientSetup.deb"
+if [ -f "$SCREENCONNECT_DEB" ]; then
+    echo "Installing ScreenConnect remote support client..."
+    dpkg -i "$SCREENCONNECT_DEB" || apt-get install -f -y
+    echo "✓ ScreenConnect installed."
+else
+    echo "NOTE: tools/ScreenConnect.ClientSetup.deb not found — skipping remote support client."
+fi
+
 echo "✓ Packages installed, Docker enabled."
 
 # ---------------------------------------------------------------------------

@@ -49,4 +49,3 @@ build/
 # Generated startup scripts
 start-gps-kiosk.bat
 update-gps-kiosk.bat
-tools/ScreenConnect.ClientSetup.deb
