@@ -85,7 +85,39 @@ echo ""
 # ---------------------------------------------------------------------------
 echo "--- Step 2: Installing system packages ---"
 
+# Install curl and ca-certificates first (needed to add Docker's apt repo)
 apt-get update -y
+apt-get install -y curl ca-certificates gnupg
+
+# Add Docker's official apt repository (docker-compose-plugin is not in Ubuntu's default repos)
+if [ ! -f /etc/apt/keyrings/docker.asc ]; then
+    echo "Adding Docker apt repository..."
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+        > /etc/apt/sources.list.d/docker.list
+    apt-get update -y
+fi
+
+# Remove Ubuntu's conflicting containerd package if present
+if dpkg -l containerd 2>/dev/null | grep -q '^ii'; then
+    echo "Removing conflicting Ubuntu containerd package..."
+    apt-get remove -y containerd
+fi
+
+# Install Docker CE from Docker's official repo
+apt-get install -y \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io \
+    docker-buildx-plugin \
+    docker-compose-plugin \
+    git \
+    unzip \
+    x11-xserver-utils \
+    xdotool
 
 # Resolve chromium package name (differs across Ubuntu versions)
 CHROMIUM_PKG=""
@@ -93,35 +125,16 @@ if apt-cache show chromium-browser &>/dev/null 2>&1; then
     CHROMIUM_PKG="chromium-browser"
 elif apt-cache show chromium &>/dev/null 2>&1; then
     CHROMIUM_PKG="chromium"
-else
-    # Snap-based Ubuntu 22.04+ — chromium is installed via snap; use the snap name
-    CHROMIUM_PKG=""
-    echo "NOTE: chromium not in apt — will install via snap."
 fi
 
-PACKAGES=(
-    docker.io
-    docker-compose-plugin
-    git
-    curl
-    unzip
-    x11-xserver-utils
-    xdotool
-)
 if [ -n "$CHROMIUM_PKG" ]; then
-    PACKAGES+=("$CHROMIUM_PKG")
-fi
-
-apt-get install -y "${PACKAGES[@]}"
-
-# Install chromium via snap if apt couldn't find it
-if [ -z "$CHROMIUM_PKG" ]; then
-    if command -v snap &>/dev/null; then
-        snap install chromium
-        CHROMIUM_PKG="chromium"
-    else
-        echo "WARNING: snap not available and chromium not in apt. Browser launch may fail."
-    fi
+    apt-get install -y "$CHROMIUM_PKG"
+elif command -v snap &>/dev/null; then
+    echo "NOTE: chromium not in apt — installing via snap."
+    snap install chromium
+    CHROMIUM_PKG="chromium"
+else
+    echo "WARNING: snap not available and chromium not in apt. Browser launch may fail."
 fi
 
 systemctl enable docker
