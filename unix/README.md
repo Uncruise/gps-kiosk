@@ -4,59 +4,30 @@ This directory contains Unix/Linux shell script versions of all the Windows Powe
 
 ## Quick Start
 
-### Ubuntu All-in-One Setup (Recommended for fresh Ubuntu installs)
-
-Run **one script** on a fresh Ubuntu machine and walk away — the system reboots into a
-full-screen GPS Kiosk with no login prompt:
+Run **one command** on any supported Linux machine and walk away — the system reboots
+into a full-screen GPS Kiosk with no login prompt and no password required:
 
 ```bash
-sudo bash unix/ubuntu-kiosk-setup.sh --password yourpassword
+sudo bash unix/quick-setup.sh
 ```
 
-Defaults: admin user = `gpsadmin`, kiosk user = `gpskiosk`. Override with:
+This creates a single dedicated `kiosk` account with no password, configures auto-login,
+starts the GPS Kiosk Docker container, and launches the browser in kiosk mode on every boot.
 
-```
---admin-username   sudo/management user account  (default: gpsadmin)
---username         auto-login kiosk user account (default: gpskiosk)
---password         shared password for both accounts (prompted if omitted)
---gps-host         TCP host for NMEA GPS input (e.g. 192.168.1.100)
---gps-port         TCP port for NMEA GPS input (e.g. 10110)
---map-lat          default map latitude
---map-lon          default map longitude
-```
-
-### Step-by-step Setup (other Linux distros or manual control)
-
-For a fresh installation with Git:
-
-```bash
-cd unix
-sudo bash quick-setup.sh
-```
-
-For a fresh installation without Git:
+For a machine without Git installed:
 
 ```bash
 cd unix
 sudo bash download-setup.sh
 ```
 
-### Simple Wrappers
-
-User-friendly wrappers that provide interactive prompts:
-
-- **setup.sh** - Interactive wrapper for quick-setup.sh
-- **download.sh** - Interactive wrapper for download-setup.sh
-- **configure-kiosk.sh** - Interactive kiosk configuration
-
 ## Script Descriptions
 
 ### Setup Scripts
 
-- **ubuntu-kiosk-setup.sh** - **All-in-one Ubuntu kiosk setup**: installs packages, creates user, deploys containers, configures auto-login, patches systemd service with `$DISPLAY`, disables screen blanking and sleep. Run once; reboot into kiosk.
-- **quick-setup.sh** - Fully automated installation with Docker auto-install, repository cloning, and startup configuration
+- **quick-setup.sh** - **All-in-one setup**: creates the `kiosk` user (no password), installs Docker, clones the repo, starts the container, configures passwordless auto-login (GDM3/LightDM), enables the systemd service, disables screen blanking, and sets up the browser kiosk autostart. Run once; reboot into kiosk.
 - **download-setup.sh** - Downloads GPS Kiosk from GitHub without requiring Git installation
-- **configure-auto-login.sh** - Configures Linux for automatic login and kiosk mode operation
+- **configure-auto-login.sh** - Standalone script to configure auto-login if needed separately
 - **configure-gps-kiosk.sh** - Configure GPS data source and map settings
 
 ### Diagnostic Scripts
@@ -97,19 +68,16 @@ By default, scripts install to:
 
 ## Auto-Start Configuration
 
-To configure the system to automatically start GPS Kiosk on boot:
+Auto-login, the systemd service, and browser kiosk launch are all configured automatically
+by `quick-setup.sh`. After running it, the machine boots directly into the kiosk display
+with no login prompt.
 
-```bash
-cd /opt/gps-kiosk/unix
-sudo ./configure-auto-login.sh --username <your-username> --password <your-password>
-```
-
-This will:
-
-1. Configure automatic login (GDM3 or LightDM)
-2. Create and enable systemd service
-3. Configure display power settings
-4. Set up browser kiosk mode launch
+The setup creates:
+- `kiosk` user account (no password)
+- GDM3 or LightDM auto-login for the `kiosk` user
+- `gps-kiosk.service` systemd unit (enabled at boot)
+- `/opt/gps-kiosk/launch-browser.sh` — waits for Signal K, then opens browser in `--kiosk` mode
+- `~/.config/autostart/gps-kiosk-browser.desktop` — triggers the browser launcher on desktop login
 
 ## Manual Service Control
 

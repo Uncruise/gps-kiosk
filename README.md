@@ -11,8 +11,9 @@ A containerized marine navigation kiosk built on Signal K technology, designed f
 
 ### For Linux/Unix Users
 
-1. **Download and run**: `unix/setup.sh`
-2. **Or use direct download**: `unix/download.sh` (no Git required)
+1. **Run setup**: `sudo bash unix/quick-setup.sh`
+   - Creates a `kiosk` account (no password), configures auto-login, starts the container, and launches the browser in kiosk mode on every boot.
+2. **No Git installed?**: `sudo bash unix/download-setup.sh`
 
 ### For IT Deployment
 
@@ -146,11 +147,13 @@ cd gps-kiosk\Windows
 
 ```bash
 # Clone repository
-git clone https://github.com/Uncruise/gps-kiosk.git
-cd gps-kiosk/unix
+sudo git clone https://github.com/Uncruise/gps-kiosk.git /opt/gps-kiosk
 
-# Run setup
-sudo bash quick-setup.sh
+# Run setup — creates 'kiosk' user (no password), auto-login, container, and browser kiosk
+sudo bash /opt/gps-kiosk/unix/quick-setup.sh
+
+# Reboot into kiosk mode
+sudo reboot
 ```
 
 ### 3. Direct Download (No Git Required)

@@ -1,241 +1,236 @@
 #!/bin/bash
-# GPS Kiosk Auto-Setup Script for Linux/Unix
-# Fully automated installation with Docker auto-install, latest pulls, and startup configuration
+# GPS Kiosk - Complete Linux Setup
+# Creates a single dedicated 'kiosk' account with no password,
+# configures auto-login, and launches the browser in kiosk mode on startup.
 
+set -euo pipefail
+
+KIOSK_USER="kiosk"
 INSTALL_PATH="/opt/gps-kiosk"
+KIOSK_URL="http://localhost:3000/@signalk/freeboard-sk/?zoom=12&northup=1&movemap=1&kiosk=1"
 
-echo "=== GPS Kiosk Auto-Setup ==="
-
-# Check if running as root for system-level installation
+# ── Root check ────────────────────────────────────────────────────────────────
 if [ "$EUID" -ne 0 ]; then
-    echo "WARNING: Not running as root. Installation will be in current directory."
-    INSTALL_PATH="$PWD/gps-kiosk"
+    echo "ERROR: Run as root:  sudo bash $0"
+    exit 1
 fi
 
-# Function to check if command exists
-command_exists() {
-    command -v "$1" &>/dev/null
-}
+echo "=== GPS Kiosk Setup ==="
+echo ""
 
-# Function to install Docker on various Linux distributions
-install_docker() {
-    echo "Docker not found. Installing Docker..."
-    
+# ── Create kiosk user ─────────────────────────────────────────────────────────
+if ! id "$KIOSK_USER" &>/dev/null; then
+    echo "Creating user '$KIOSK_USER'..."
+    useradd -m -s /bin/bash "$KIOSK_USER"
+fi
+passwd -d "$KIOSK_USER"          # remove password (passwordless account)
+echo "✓ User '$KIOSK_USER' configured (no password)"
+
+# ── Install Docker ────────────────────────────────────────────────────────────
+command_exists() { command -v "$1" &>/dev/null; }
+
+if ! command_exists docker; then
+    echo "Installing Docker..."
     if [ -f /etc/debian_version ]; then
-        # Debian/Ubuntu
-        echo "Detected Debian/Ubuntu system"
-        apt-get update
+        apt-get update -qq
         apt-get install -y ca-certificates curl gnupg
         install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+            | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
         chmod a+r /etc/apt/keyrings/docker.gpg
-        
-        echo \
-          "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-          "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-          tee /etc/apt/sources.list.d/docker.list > /dev/null
-        
-        apt-get update
-        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-        
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+            | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt-get update -qq
+        apt-get install -y docker-ce docker-ce-cli containerd.io \
+            docker-buildx-plugin docker-compose-plugin
     elif [ -f /etc/redhat-release ]; then
-        # RHEL/CentOS/Fedora
-        echo "Detected RHEL/CentOS/Fedora system"
         yum install -y yum-utils
         yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-        yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-        
-    elif [ -f /etc/arch-release ]; then
-        # Arch Linux
-        echo "Detected Arch Linux"
-        pacman -Sy --noconfirm docker docker-compose
-        
+        yum install -y docker-ce docker-ce-cli containerd.io \
+            docker-buildx-plugin docker-compose-plugin
     else
-        echo "Unsupported distribution. Please install Docker manually."
-        echo "Visit: https://docs.docker.com/engine/install/"
+        echo "ERROR: Unsupported distro. Install Docker manually."
+        echo "       https://docs.docker.com/engine/install/"
         exit 1
     fi
-    
-    # Start and enable Docker service
-    systemctl start docker
-    systemctl enable docker
-    
-    # Add current user to docker group (if not root)
-    if [ "$EUID" -ne 0 ]; then
-        usermod -aG docker "$SUDO_USER"
-        echo "User added to docker group. You may need to log out and back in."
-    fi
-    
-    echo "Docker installed successfully."
-}
-
-# Check and install Docker if needed
-echo "Checking Docker..."
-if ! command_exists docker; then
-    if [ "$EUID" -eq 0 ]; then
-        install_docker
-    else
-        echo "Docker not found and not running as root."
-        echo "Please install Docker manually or run this script with sudo."
-        exit 1
-    fi
+    systemctl enable --now docker
+    echo "✓ Docker installed"
 fi
 
-# Ensure Docker service is running
-if ! systemctl is-active --quiet docker; then
-    echo "Starting Docker service..."
-    systemctl start docker
-fi
+usermod -aG docker "$KIOSK_USER"
+echo "✓ $KIOSK_USER added to docker group"
 
-# Wait for Docker to be ready
-echo "Waiting for Docker daemon..."
-timeout=60
-elapsed=0
-until docker info &>/dev/null; do
-    sleep 2
-    elapsed=$((elapsed + 2))
-    if [ $elapsed -ge $timeout ]; then
-        echo "Docker daemon failed to start within timeout."
-        exit 1
-    fi
-done
-echo "Docker daemon is ready."
-
-# Auto-install Git if needed
-echo "Checking Git..."
+# ── Install Git ───────────────────────────────────────────────────────────────
 if ! command_exists git; then
-    echo "Git not found. Installing Git..."
+    echo "Installing Git..."
     if [ -f /etc/debian_version ]; then
-        apt-get update && apt-get install -y git
+        apt-get install -y git
     elif [ -f /etc/redhat-release ]; then
         yum install -y git
-    elif [ -f /etc/arch-release ]; then
-        pacman -Sy --noconfirm git
     fi
 fi
 
-# Create installation directory
+# ── Wait for Docker daemon ────────────────────────────────────────────────────
+systemctl start docker
+echo "Waiting for Docker daemon..."
+until docker info &>/dev/null; do sleep 1; done
+
+# ── Clone / update repo ───────────────────────────────────────────────────────
 mkdir -p "$INSTALL_PATH"
-cd "$INSTALL_PATH" || exit 1
+chown "$KIOSK_USER:$KIOSK_USER" "$INSTALL_PATH"
 
-# Clone or update repository
-if [ -d ".git" ]; then
-    echo "Repository exists. Pulling latest updates..."
-    git pull
+if [ -d "$INSTALL_PATH/.git" ]; then
+    echo "Updating GPS Kiosk repo..."
+    sudo -u "$KIOSK_USER" git -C "$INSTALL_PATH" pull
 else
-    echo "Cloning GPS Kiosk repository..."
-    git clone https://github.com/Uncruise/gps-kiosk.git .
+    echo "Cloning GPS Kiosk repo..."
+    sudo -u "$KIOSK_USER" git clone https://github.com/Uncruise/gps-kiosk.git "$INSTALL_PATH"
 fi
 
-# Pull latest Docker images
-echo "Pulling latest Docker images..."
-docker compose pull
+# ── Start GPS Kiosk container ─────────────────────────────────────────────────
+echo "Pulling Docker images..."
+sudo -u "$KIOSK_USER" docker compose -f "$INSTALL_PATH/docker-compose.yml" pull
+echo "Starting GPS Kiosk container..."
+sudo -u "$KIOSK_USER" docker compose -f "$INSTALL_PATH/docker-compose.yml" up -d
+echo "✓ GPS Kiosk container started"
 
-# Start GPS Kiosk
-echo "Starting GPS Kiosk containers..."
-docker compose up -d
+# ── systemd service (keeps container running across reboots) ──────────────────
+cat > /etc/systemd/system/gps-kiosk.service << EOF
+[Unit]
+Description=GPS Kiosk Navigation System
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
 
-# Wait for service to be ready
-echo "Waiting for GPS Kiosk to be ready..."
-timeout=120
-elapsed=0
-until curl -s http://localhost:3000/signalk/ &>/dev/null; do
-    sleep 2
-    elapsed=$((elapsed + 2))
-    if [ $elapsed -ge $timeout ]; then
-        echo "GPS Kiosk failed to start within timeout."
-        echo "Check logs with: docker logs gps-kiosk"
-        exit 1
-    fi
-done
+[Service]
+Type=simple
+User=$KIOSK_USER
+WorkingDirectory=$INSTALL_PATH
+ExecStartPre=/usr/bin/git -C $INSTALL_PATH pull
+ExecStartPre=/usr/bin/docker compose -f $INSTALL_PATH/docker-compose.yml pull
+ExecStart=/usr/bin/docker compose -f $INSTALL_PATH/docker-compose.yml up --force-recreate
+ExecStop=/usr/bin/docker compose -f $INSTALL_PATH/docker-compose.yml down
+Restart=on-failure
+RestartSec=10
 
-echo "✓ GPS Kiosk is running!"
+[Install]
+WantedBy=multi-user.target
+EOF
 
-# Create startup script
-cat > "$INSTALL_PATH/start-gps-kiosk.sh" << 'EOFSTART'
+systemctl daemon-reload
+systemctl enable gps-kiosk.service
+echo "✓ GPS Kiosk systemd service enabled"
+
+# ── Configure passwordless auto-login ─────────────────────────────────────────
+if command_exists gdm3 || [ -f /etc/gdm3/custom.conf ]; then
+    echo "Configuring GDM3 auto-login..."
+    mkdir -p /etc/gdm3
+    cat > /etc/gdm3/custom.conf << EOF
+[daemon]
+AutomaticLoginEnable=true
+AutomaticLogin=$KIOSK_USER
+
+[security]
+
+[xdmcp]
+
+[chooser]
+
+[debug]
+EOF
+    echo "✓ GDM3 auto-login configured"
+
+elif command_exists lightdm || [ -f /etc/lightdm/lightdm.conf ]; then
+    echo "Configuring LightDM auto-login..."
+    mkdir -p /etc/lightdm
+    cat > /etc/lightdm/lightdm.conf << EOF
+[Seat:*]
+autologin-user=$KIOSK_USER
+autologin-user-timeout=0
+EOF
+    # LightDM needs user in nopasswdlogin group for PAM
+    groupadd -f nopasswdlogin
+    usermod -aG nopasswdlogin "$KIOSK_USER"
+    echo "✓ LightDM auto-login configured"
+
+else
+    echo "WARNING: No supported display manager found (GDM3 or LightDM)."
+    echo "         Configure auto-login manually for your display manager."
+fi
+
+# ── Disable screen blanking ───────────────────────────────────────────────────
+mkdir -p /etc/X11/xorg.conf.d
+cat > /etc/X11/xorg.conf.d/10-kiosk.conf << 'EOF'
+Section "ServerFlags"
+    Option "BlankTime"   "0"
+    Option "StandbyTime" "0"
+    Option "SuspendTime" "0"
+    Option "OffTime"     "0"
+EndSection
+EOF
+echo "✓ Screen blanking disabled"
+
+# ── Browser launcher script ───────────────────────────────────────────────────
+cat > "$INSTALL_PATH/launch-browser.sh" << EOF
 #!/bin/bash
-# GPS Kiosk Auto-Startup Script - Runs on every boot
-echo "Starting GPS Kiosk Auto-Startup..."
-cd "$(dirname "$0")"
+# Wait for GPS Kiosk service to be ready, then open browser in kiosk mode.
+KIOSK_URL="$KIOSK_URL"
 
-# Ensure Docker is running
-if ! docker info &>/dev/null; then
-    echo "Starting Docker service..."
-    sudo systemctl start docker
-    
-    # Wait for Docker to be ready
-    timeout=60
-    elapsed=0
-    until docker info &>/dev/null; do
-        sleep 2
-        elapsed=$((elapsed + 2))
-        if [ $elapsed -ge $timeout ]; then
-            echo "Docker failed to start"
-            exit 1
-        fi
-    done
-fi
-
-# Update repository if Git is available
-if [ -d .git ]; then
-    echo "Updating GPS Kiosk to latest version..."
-    git reset --hard HEAD
-    git pull
-fi
-
-# Pull latest Docker images and start containers
-echo "Pulling latest Docker images..."
-docker compose pull
-echo "Starting GPS Kiosk containers..."
-docker compose up -d --force-recreate
-
-# Wait for service
-echo "Waiting for GPS Kiosk to be ready..."
-timeout=120
-elapsed=0
-until curl -s http://localhost:3000/signalk/ &>/dev/null; do
+echo "Waiting for GPS Kiosk service..."
+until curl -sf http://localhost:3000/signalk/ &>/dev/null; do
     sleep 2
-    elapsed=$((elapsed + 2))
-    if [ $elapsed -ge $timeout ]; then
-        echo "GPS Kiosk failed to start"
-        exit 1
-    fi
 done
 
-echo "GPS Kiosk is ready!"
+# Disable screensaver / power management
+xset s off    2>/dev/null || true
+xset s noblank 2>/dev/null || true
+xset -dpms    2>/dev/null || true
 
-# Launch browser in kiosk mode if DISPLAY is set
-if [ -n "$DISPLAY" ]; then
-    kioskUrl="http://localhost:3000/@signalk/freeboard-sk/?zoom=12&northup=1&movemap=1&kiosk=1"
-    
-    if command -v chromium-browser &>/dev/null; then
-        chromium-browser --kiosk --no-first-run --disable-session-crashed-bubble "$kioskUrl" &
-    elif command -v chromium &>/dev/null; then
-        chromium --kiosk --no-first-run --disable-session-crashed-bubble "$kioskUrl" &
-    elif command -v google-chrome &>/dev/null; then
-        google-chrome --kiosk --no-first-run --disable-session-crashed-bubble "$kioskUrl" &
-    elif command -v firefox &>/dev/null; then
-        firefox --kiosk "$kioskUrl" &
-    else
-        echo "No supported browser found for kiosk mode"
-        echo "Please open: $kioskUrl"
-    fi
+# Launch browser
+if command -v chromium-browser &>/dev/null; then
+    exec chromium-browser --kiosk --no-first-run --disable-session-crashed-bubble \\
+        --disable-infobars --noerrdialogs --disable-translate "\$KIOSK_URL"
+elif command -v chromium &>/dev/null; then
+    exec chromium --kiosk --no-first-run --disable-session-crashed-bubble \\
+        --disable-infobars --noerrdialogs --disable-translate "\$KIOSK_URL"
+elif command -v google-chrome &>/dev/null; then
+    exec google-chrome --kiosk --no-first-run --disable-session-crashed-bubble \\
+        --disable-infobars --noerrdialogs --disable-translate "\$KIOSK_URL"
+elif command -v firefox &>/dev/null; then
+    exec firefox --kiosk "\$KIOSK_URL"
+else
+    echo "ERROR: No browser found. Install chromium or firefox."
+    exit 1
 fi
-EOFSTART
+EOF
+chmod +x "$INSTALL_PATH/launch-browser.sh"
+chown "$KIOSK_USER:$KIOSK_USER" "$INSTALL_PATH/launch-browser.sh"
 
-chmod +x "$INSTALL_PATH/start-gps-kiosk.sh"
+# ── Autostart entry (GNOME / XFCE / KDE session) ─────────────────────────────
+KIOSK_HOME="/home/$KIOSK_USER"
+AUTOSTART_DIR="$KIOSK_HOME/.config/autostart"
+mkdir -p "$AUTOSTART_DIR"
+cat > "$AUTOSTART_DIR/gps-kiosk-browser.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=GPS Kiosk Browser
+Exec=$INSTALL_PATH/launch-browser.sh
+X-GNOME-Autostart-enabled=true
+Hidden=false
+NoDisplay=false
+EOF
+chown -R "$KIOSK_USER:$KIOSK_USER" "$KIOSK_HOME/.config"
+echo "✓ Browser autostart configured"
 
+# ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
-echo "=== Setup Complete! ==="
+echo "=== Setup Complete ==="
 echo ""
-echo "GPS Kiosk is accessible at:"
-echo "  http://localhost:3000/@signalk/freeboard-sk/?zoom=12&northup=1&movemap=1&kiosk=1"
+echo "  Kiosk user:  $KIOSK_USER  (no password)"
+echo "  Auto-login:  enabled"
+echo "  Kiosk URL:   $KIOSK_URL"
 echo ""
-echo "To configure auto-start on boot:"
-echo "  sudo ./configure-auto-login.sh --username <your-username> --password <your-password>"
-echo ""
-echo "Manual controls:"
-echo "  Start: docker compose up -d"
-echo "  Stop: docker compose down"
-echo "  View logs: docker logs -f gps-kiosk"
+echo "Reboot to start in full kiosk mode:"
+echo "  sudo reboot"
 echo ""

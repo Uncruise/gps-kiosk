@@ -171,17 +171,10 @@ Both Windows and Unix versions:
    - `COM2` → `/dev/ttyS1`
    - etc.
 
-3. Run Unix setup:
+3. Run Unix setup (handles everything — creates `kiosk` user, auto-login, and browser launch):
 
    ```bash
-   cd /opt/gps-kiosk/unix
-   sudo bash quick-setup.sh
-   ```
-
-4. Configure auto-start:
-
-   ```bash
-   sudo bash configure-auto-login.sh --username gps --password yourpassword
+   sudo bash /opt/gps-kiosk/unix/quick-setup.sh
    ```
 
 ### From Unix to Windows

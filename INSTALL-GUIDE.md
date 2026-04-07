@@ -11,22 +11,6 @@ No prior Linux experience required. Follow each step in order.
 - A USB stick (8 GB or larger) — **all data on it will be erased**
 - A separate Windows PC to prepare the USB stick
 - An internet connection at the kiosk machine during setup
-- The passwords recorded in the section below
-
----
-
-## Passwords
-
-Fill these in before you start. Keep this document somewhere safe.
-
-| Account | Username | Password |
-|---------|----------|----------|
-| Admin (management) | `gpsadmin` | ________________________ |
-| Kiosk (auto-login) | `gpskiosk` | ________________________ |
-
-> Both accounts can share the same password if preferred.
-> The **admin** account is for logging in to manage the machine.
-> The **kiosk** account logs in automatically on boot and runs the navigation display.
 
 ---
 
@@ -82,7 +66,7 @@ Fill these in before you start. Keep this document somewhere safe.
    - **Your name:** GPS Admin
    - **Computer name:** gps-kiosk-01 *(or a name that identifies the machine)*
    - **Username:** `gpsadmin`
-   - **Password:** *(enter the admin password from the table above)*
+   - **Password:** *(choose any password — this is the admin account you use to make changes)*
    - Check **Require my password to log in**
 9. Select your time zone. Click **Next**.
 10. Review the summary and click **Install**.
@@ -127,47 +111,39 @@ In the terminal, type the following and press **Enter**:
 sudo apt-get install -y git && sudo git clone https://github.com/Uncruise/gps-kiosk.git /opt/gps-kiosk
 ```
 
-When prompted, enter the **admin password** (`gpsadmin`'s password).
+When prompted, enter the **admin password** (the `gpsadmin` password you chose during Ubuntu install).
 
 ### 4.2 Run the Setup
 
-Type the following command, replacing the placeholder with the password from your table:
-
 ```
-sudo bash /opt/gps-kiosk/unix/ubuntu-kiosk-setup.sh --password YOUR_PASSWORD_HERE
-```
-
-Example (if your password is `Anchor2024`):
-
-```
-sudo bash /opt/gps-kiosk/unix/ubuntu-kiosk-setup.sh --password Anchor2024
+sudo bash /opt/gps-kiosk/unix/quick-setup.sh
 ```
 
 > This script will:
 > - Install Docker and all required software
-> - Create the `gpsadmin` and `gpskiosk` user accounts
+> - Create a dedicated `kiosk` account with **no password**
 > - Download and start the GPS Kiosk navigation software
-> - Configure the machine to boot directly into the kiosk display
+> - Configure the machine to auto-login as `kiosk` and boot directly into the kiosk display
 > - Disable screen sleep and lock screens
 >
 > It will take **5–15 minutes** depending on internet speed. You will see progress messages scrolling by — this is normal.
 
 ### 4.3 Verify the Setup
 
-At the end of the script, you will see a verification table like this:
+At the end of the script you should see lines like:
 
 ```
-  ✓  Docker daemon running
-  ✓  GPS Kiosk container running
-  ✓  Signal K responding
-  ✓  gps-kiosk.service enabled
-  ✓  start-gps-kiosk.sh executable
-  ✓  Kiosk user exists
-  ✓  sudoers file present
-  ✓  Browser binary found
+✓ User 'kiosk' configured (no password)
+✓ Docker installed
+✓ kiosk added to docker group
+✓ GPS Kiosk container started
+✓ GPS Kiosk systemd service enabled
+✓ GDM3 auto-login configured   (or LightDM)
+✓ Screen blanking disabled
+✓ Browser autostart configured
 ```
 
-All items should show **✓**. If any show **✗**, take a photo of the terminal and contact Morris.
+If you see any errors, take a photo of the terminal and contact Morris.
 
 ---
 
@@ -184,9 +160,10 @@ sudo reboot
 ### 5.2 What to Expect After Reboot
 
 1. The machine restarts.
-2. It automatically logs in as `gpskiosk` — **no password prompt will appear**.
-3. After about 30–60 seconds, the browser opens full-screen showing the GPS navigation map.
-4. The display should show the Freeboard-SK navigation interface.
+2. It automatically logs in as `kiosk` — **no password prompt will appear**.
+3. The `gps-kiosk` systemd service starts and pulls the latest image.
+4. After about 30–60 seconds, the browser opens full-screen showing the GPS navigation map.
+5. The display should show the Freeboard-SK navigation interface.
 
 If the map appears, the installation is complete.
 
@@ -226,7 +203,7 @@ Press **Ctrl + Alt + F2** to switch to a login terminal, or press **Ctrl + Alt +
 
 ## Summary of Accounts
 
-| Account | Purpose | Notes |
-|---------|---------|-------|
-| `gpsadmin` | Administration and management | Use this to make changes, run updates, or troubleshoot |
-| `gpskiosk` | Kiosk display (auto-login) | Runs the navigation browser on boot; do not log into this account manually |
+| Account | Purpose | Password | Notes |
+|---------|---------|----------|-------|
+| `gpsadmin` | Administration and management | Set during Ubuntu install | Use this to make changes, run updates, or troubleshoot |
+| `kiosk` | Kiosk display (auto-login) | None | Logs in automatically on boot; runs the navigation browser |
