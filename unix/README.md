@@ -5,14 +5,16 @@ This directory contains Unix/Linux shell script versions of all the Windows Powe
 ## Quick Start
 
 Run **one command** on any supported Linux machine and walk away — the system reboots
-into a full-screen GPS Kiosk with no login prompt and no password required:
+into a full-screen GPS Kiosk with no login prompt:
 
 ```bash
 sudo bash unix/quick-setup.sh
 ```
 
-This creates a single dedicated `kiosk` account with no password, configures auto-login,
-starts the GPS Kiosk Docker container, and launches the browser in kiosk mode on every boot.
+The script uses the account that ran `sudo` as the single kiosk account. It configures
+auto-login for that user, installs Docker, starts the GPS Kiosk container, and launches
+the browser in kiosk mode on every boot. All files are written to `/opt/` and `/etc/` —
+no user home folders are used.
 
 For a machine without Git installed:
 
@@ -72,12 +74,12 @@ Auto-login, the systemd service, and browser kiosk launch are all configured aut
 by `quick-setup.sh`. After running it, the machine boots directly into the kiosk display
 with no login prompt.
 
-The setup creates:
-- `kiosk` user account (no password)
-- GDM3 or LightDM auto-login for the `kiosk` user
-- `gps-kiosk.service` systemd unit (enabled at boot)
+The setup creates (everything in `/opt/` and `/etc/` — no user home folders):
+- GDM3 or LightDM auto-login for the account that ran `sudo`
+- `gps-kiosk.service` systemd unit (`/etc/systemd/system/`) — enabled at boot
 - `/opt/gps-kiosk/launch-browser.sh` — waits for Signal K, then opens browser in `--kiosk` mode
-- `~/.config/autostart/gps-kiosk-browser.desktop` — triggers the browser launcher on desktop login
+- `/etc/xdg/autostart/gps-kiosk-browser.desktop` — system-wide autostart, triggers the browser on desktop login
+- `/etc/X11/xorg.conf.d/10-kiosk.conf` — disables screen blanking
 
 ## Manual Service Control
 

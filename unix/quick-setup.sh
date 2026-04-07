@@ -1,11 +1,10 @@
 #!/bin/bash
 # GPS Kiosk - Complete Linux Setup
-# Creates a single dedicated 'kiosk' account with no password,
-# configures auto-login, and launches the browser in kiosk mode on startup.
+# Configures the account that ran sudo for passwordless auto-login.
+# All files kept under /opt/ and /etc/ — no user home folders touched.
 
 set -euo pipefail
 
-KIOSK_USER="kiosk"
 INSTALL_PATH="/opt/gps-kiosk"
 KIOSK_URL="http://localhost:3000/@signalk/freeboard-sk/?zoom=12&northup=1&movemap=1&kiosk=1"
 
@@ -15,16 +14,17 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-echo "=== GPS Kiosk Setup ==="
-echo ""
-
-# ── Create kiosk user ─────────────────────────────────────────────────────────
-if ! id "$KIOSK_USER" &>/dev/null; then
-    echo "Creating user '$KIOSK_USER'..."
-    useradd -m -s /bin/bash "$KIOSK_USER"
+# Use the user who invoked sudo — that is the single kiosk account.
+KIOSK_USER="${SUDO_USER:-}"
+if [ -z "$KIOSK_USER" ] || [ "$KIOSK_USER" = "root" ]; then
+    echo "ERROR: Run with sudo, not as root directly."
+    echo "       Example:  sudo bash $0"
+    exit 1
 fi
-passwd -d "$KIOSK_USER"          # remove password (passwordless account)
-echo "✓ User '$KIOSK_USER' configured (no password)"
+
+echo "=== GPS Kiosk Setup ==="
+echo "Kiosk user: $KIOSK_USER"
+echo ""
 
 # ── Install Docker ────────────────────────────────────────────────────────────
 command_exists() { command -v "$1" &>/dev/null; }
@@ -76,7 +76,7 @@ systemctl start docker
 echo "Waiting for Docker daemon..."
 until docker info &>/dev/null; do sleep 1; done
 
-# ── Clone / update repo ───────────────────────────────────────────────────────
+# ── Clone / update repo into /opt/ ───────────────────────────────────────────
 mkdir -p "$INSTALL_PATH"
 chown "$KIOSK_USER:$KIOSK_USER" "$INSTALL_PATH"
 
@@ -95,7 +95,7 @@ echo "Starting GPS Kiosk container..."
 sudo -u "$KIOSK_USER" docker compose -f "$INSTALL_PATH/docker-compose.yml" up -d
 echo "✓ GPS Kiosk container started"
 
-# ── systemd service (keeps container running across reboots) ──────────────────
+# ── systemd service ───────────────────────────────────────────────────────────
 cat > /etc/systemd/system/gps-kiosk.service << EOF
 [Unit]
 Description=GPS Kiosk Navigation System
@@ -122,7 +122,7 @@ systemctl daemon-reload
 systemctl enable gps-kiosk.service
 echo "✓ GPS Kiosk systemd service enabled"
 
-# ── Configure passwordless auto-login ─────────────────────────────────────────
+# ── Passwordless auto-login ───────────────────────────────────────────────────
 if command_exists gdm3 || [ -f /etc/gdm3/custom.conf ]; then
     echo "Configuring GDM3 auto-login..."
     mkdir -p /etc/gdm3
@@ -149,7 +149,6 @@ elif command_exists lightdm || [ -f /etc/lightdm/lightdm.conf ]; then
 autologin-user=$KIOSK_USER
 autologin-user-timeout=0
 EOF
-    # LightDM needs user in nopasswdlogin group for PAM
     groupadd -f nopasswdlogin
     usermod -aG nopasswdlogin "$KIOSK_USER"
     echo "✓ LightDM auto-login configured"
@@ -171,10 +170,10 @@ EndSection
 EOF
 echo "✓ Screen blanking disabled"
 
-# ── Browser launcher script ───────────────────────────────────────────────────
+# ── Browser launcher (lives in /opt/) ────────────────────────────────────────
 cat > "$INSTALL_PATH/launch-browser.sh" << EOF
 #!/bin/bash
-# Wait for GPS Kiosk service to be ready, then open browser in kiosk mode.
+# Waits for GPS Kiosk service, then opens the browser in kiosk mode.
 KIOSK_URL="$KIOSK_URL"
 
 echo "Waiting for GPS Kiosk service..."
@@ -182,20 +181,18 @@ until curl -sf http://localhost:3000/signalk/ &>/dev/null; do
     sleep 2
 done
 
-# Disable screensaver / power management
-xset s off    2>/dev/null || true
+xset s off     2>/dev/null || true
 xset s noblank 2>/dev/null || true
-xset -dpms    2>/dev/null || true
+xset -dpms     2>/dev/null || true
 
-# Launch browser
 if command -v chromium-browser &>/dev/null; then
-    exec chromium-browser --kiosk --no-first-run --disable-session-crashed-bubble \\
+    exec chromium-browser --kiosk --no-first-run --disable-session-crashed-bubble \
         --disable-infobars --noerrdialogs --disable-translate "\$KIOSK_URL"
 elif command -v chromium &>/dev/null; then
-    exec chromium --kiosk --no-first-run --disable-session-crashed-bubble \\
+    exec chromium --kiosk --no-first-run --disable-session-crashed-bubble \
         --disable-infobars --noerrdialogs --disable-translate "\$KIOSK_URL"
 elif command -v google-chrome &>/dev/null; then
-    exec google-chrome --kiosk --no-first-run --disable-session-crashed-bubble \\
+    exec google-chrome --kiosk --no-first-run --disable-session-crashed-bubble \
         --disable-infobars --noerrdialogs --disable-translate "\$KIOSK_URL"
 elif command -v firefox &>/dev/null; then
     exec firefox --kiosk "\$KIOSK_URL"
@@ -205,13 +202,11 @@ else
 fi
 EOF
 chmod +x "$INSTALL_PATH/launch-browser.sh"
-chown "$KIOSK_USER:$KIOSK_USER" "$INSTALL_PATH/launch-browser.sh"
+echo "✓ Browser launcher written to $INSTALL_PATH/launch-browser.sh"
 
-# ── Autostart entry (GNOME / XFCE / KDE session) ─────────────────────────────
-KIOSK_HOME="/home/$KIOSK_USER"
-AUTOSTART_DIR="$KIOSK_HOME/.config/autostart"
-mkdir -p "$AUTOSTART_DIR"
-cat > "$AUTOSTART_DIR/gps-kiosk-browser.desktop" << EOF
+# ── System-wide autostart (in /etc/ — no user home folders) ──────────────────
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/gps-kiosk-browser.desktop << EOF
 [Desktop Entry]
 Type=Application
 Name=GPS Kiosk Browser
@@ -220,17 +215,15 @@ X-GNOME-Autostart-enabled=true
 Hidden=false
 NoDisplay=false
 EOF
-chown -R "$KIOSK_USER:$KIOSK_USER" "$KIOSK_HOME/.config"
-echo "✓ Browser autostart configured"
+echo "✓ Browser autostart configured (/etc/xdg/autostart/)"
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Setup Complete ==="
 echo ""
-echo "  Kiosk user:  $KIOSK_USER  (no password)"
-echo "  Auto-login:  enabled"
-echo "  Kiosk URL:   $KIOSK_URL"
+echo "  User:       $KIOSK_USER (auto-login on boot)"
+echo "  Kiosk URL:  $KIOSK_URL"
 echo ""
-echo "Reboot to start in full kiosk mode:"
+echo "Reboot to start in kiosk mode:"
 echo "  sudo reboot"
 echo ""

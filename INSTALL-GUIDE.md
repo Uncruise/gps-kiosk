@@ -63,10 +63,10 @@ No prior Linux experience required. Follow each step in order.
    > **Warning:** This will delete everything on the machine's hard drive. Make sure there is nothing important on it.
 7. Click **Next**, then **Install**.
 8. On the "Create your account" screen:
-   - **Your name:** GPS Admin
+   - **Your name:** GPS Kiosk
    - **Computer name:** gps-kiosk-01 *(or a name that identifies the machine)*
-   - **Username:** `gpsadmin`
-   - **Password:** *(choose any password — this is the admin account you use to make changes)*
+   - **Username:** `kiosk`
+   - **Password:** *(choose any password — you will need it to run the setup script)*
    - Check **Require my password to log in**
 9. Select your time zone. Click **Next**.
 10. Review the summary and click **Install**.
@@ -81,7 +81,7 @@ No prior Linux experience required. Follow each step in order.
 ### 3.1 Log In
 
 1. The machine will reboot and show the login screen.
-2. Log in as **gpsadmin** with the admin password.
+2. Log in as **kiosk** with the password you chose during install.
 
 ### 3.2 Connect to the Internet
 
@@ -111,7 +111,7 @@ In the terminal, type the following and press **Enter**:
 sudo apt-get install -y git && sudo git clone https://github.com/Uncruise/gps-kiosk.git /opt/gps-kiosk
 ```
 
-When prompted, enter the **admin password** (the `gpsadmin` password you chose during Ubuntu install).
+When prompted, enter the **kiosk** password you chose during Ubuntu install.
 
 ### 4.2 Run the Setup
 
@@ -121,9 +121,9 @@ sudo bash /opt/gps-kiosk/unix/quick-setup.sh
 
 > This script will:
 > - Install Docker and all required software
-> - Create a dedicated `kiosk` account with **no password**
-> - Download and start the GPS Kiosk navigation software
-> - Configure the machine to auto-login as `kiosk` and boot directly into the kiosk display
+> - Configure the `kiosk` account to auto-login on boot (no password prompt)
+> - Download and start the GPS Kiosk navigation software into `/opt/gps-kiosk/`
+> - Configure the machine to boot directly into the kiosk display
 > - Disable screen sleep and lock screens
 >
 > It will take **5–15 minutes** depending on internet speed. You will see progress messages scrolling by — this is normal.
@@ -133,14 +133,12 @@ sudo bash /opt/gps-kiosk/unix/quick-setup.sh
 At the end of the script you should see lines like:
 
 ```
-✓ User 'kiosk' configured (no password)
-✓ Docker installed
 ✓ kiosk added to docker group
 ✓ GPS Kiosk container started
 ✓ GPS Kiosk systemd service enabled
-✓ GDM3 auto-login configured   (or LightDM)
+✓ GDM3 auto-login configured
 ✓ Screen blanking disabled
-✓ Browser autostart configured
+✓ Browser autostart configured (/etc/xdg/autostart/)
 ```
 
 If you see any errors, take a photo of the terminal and contact Morris.
@@ -173,7 +171,7 @@ If the map appears, the installation is complete.
 
 ### The machine boots to a login screen instead of the kiosk
 
-Log in as `gpsadmin` and run:
+Log in as `kiosk` and run:
 
 ```
 sudo systemctl status gps-kiosk.service
@@ -193,17 +191,18 @@ Take a photo of the output and contact Morris.
 
 ### The script failed partway through
 
-The script is safe to run again. Re-run the same command from Step 4.2 — it will skip steps that are already complete.
+The script is safe to run again. Re-run the same command from Step 4.2.
 
 ### Need to access the desktop while in kiosk mode
 
-Press **Ctrl + Alt + F2** to switch to a login terminal, or press **Ctrl + Alt + T** to try opening a terminal over the kiosk window. Log in as `gpsadmin`.
+Press **Ctrl + Alt + F2** to switch to a login terminal, or press **Ctrl + Alt + T** to try opening a terminal over the kiosk window.
 
 ---
 
-## Summary of Accounts
+## Account Summary
 
-| Account | Purpose | Password | Notes |
-|---------|---------|----------|-------|
-| `gpsadmin` | Administration and management | Set during Ubuntu install | Use this to make changes, run updates, or troubleshoot |
-| `kiosk` | Kiosk display (auto-login) | None | Logs in automatically on boot; runs the navigation browser |
+There is one account on this machine:
+
+| Account | Purpose | Password |
+|---------|---------|----------|
+| `kiosk` | Runs the navigation display; auto-logs in on boot | Set during Ubuntu install (used only for sudo/setup) |

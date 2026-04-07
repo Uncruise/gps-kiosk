@@ -171,7 +171,7 @@ Both Windows and Unix versions:
    - `COM2` → `/dev/ttyS1`
    - etc.
 
-3. Run Unix setup (handles everything — creates `kiosk` user, auto-login, and browser launch):
+3. Run Unix setup (handles everything — auto-login, container, and browser launch; no second user created):
 
    ```bash
    sudo bash /opt/gps-kiosk/unix/quick-setup.sh
