@@ -176,9 +176,11 @@ cat > "$INSTALL_PATH/launch-browser.sh" << EOF
 # Waits for GPS Kiosk service, then opens the browser in kiosk mode.
 KIOSK_URL="$KIOSK_URL"
 
-echo "Waiting for GPS Kiosk service..."
+echo "Waiting for GPS Kiosk service to start..."
+sleep 30
+echo "Checking Signal K..."
 until curl -sf http://localhost:3000/signalk/ &>/dev/null; do
-    sleep 2
+    sleep 5
 done
 
 xset s off     2>/dev/null || true
