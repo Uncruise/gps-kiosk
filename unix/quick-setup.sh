@@ -78,7 +78,7 @@ until docker info &>/dev/null; do sleep 1; done
 
 # ── Clone / update repo into /opt/ ───────────────────────────────────────────
 mkdir -p "$INSTALL_PATH"
-chown "$KIOSK_USER:$KIOSK_USER" "$INSTALL_PATH"
+chown -R "$KIOSK_USER:$KIOSK_USER" "$INSTALL_PATH"
 
 if [ -d "$INSTALL_PATH/.git" ]; then
     echo "Updating GPS Kiosk repo..."
