@@ -29,6 +29,25 @@
             "subOptions": {
               "validateChecksum": true,
               "type": "tcp",
+              "host": "172.16.1.96",
+              "port": "23"
+            }
+          }
+        }
+      ],
+      "id": "SEN",
+      "enabled": true
+    },
+    {
+      "pipeElements": [
+        {
+          "type": "providers/simple",
+          "options": {
+            "logging": false,
+            "type": "NMEA0183",
+            "subOptions": {
+              "validateChecksum": true,
+              "type": "tcp",
               "host": "192.168.5.26",
               "port": "23"
             }
