@@ -95,19 +95,63 @@ echo "Starting GPS Kiosk container..."
 sudo -u "$KIOSK_USER" docker compose -f "$INSTALL_PATH/docker-compose.yml" up -d
 echo "✓ GPS Kiosk container started"
 
+# ── Boot-time update + setup checker ─────────────────────────────────────────
+# Runs as root before the Docker service. Does git pull, then re-applies
+# kiosk-quick-setup.sh if it changed since last boot.
+
+mkdir -p /var/lib/gps-kiosk
+sha256sum "$INSTALL_PATH/unix/kiosk-quick-setup.sh" | cut -d' ' -f1 \
+    > /var/lib/gps-kiosk/setup.hash
+
+cat > "$INSTALL_PATH/check-and-apply-setup.sh" << EOF
+#!/bin/bash
+INSTALL_PATH="$INSTALL_PATH"
+KIOSK_USER="$KIOSK_USER"
+HASH_FILE="/var/lib/gps-kiosk/setup.hash"
+SETUP_SCRIPT="\$INSTALL_PATH/unix/kiosk-quick-setup.sh"
+
+sudo -u "\$KIOSK_USER" git -C "\$INSTALL_PATH" pull 2>&1 | logger -t gps-kiosk-setup
+
+CURRENT_HASH=\$(sha256sum "\$SETUP_SCRIPT" | cut -d' ' -f1)
+STORED_HASH=\$(cat "\$HASH_FILE" 2>/dev/null || echo "")
+
+if [ "\$CURRENT_HASH" != "\$STORED_HASH" ]; then
+    logger -t gps-kiosk-setup "kiosk-quick-setup.sh changed — re-applying..."
+    echo "n" | bash "\$SETUP_SCRIPT" "\$KIOSK_USER" 2>&1 | logger -t gps-kiosk-setup
+    echo "\$CURRENT_HASH" > "\$HASH_FILE"
+    logger -t gps-kiosk-setup "Setup re-applied."
+fi
+EOF
+chmod +x "$INSTALL_PATH/check-and-apply-setup.sh"
+
+cat > /etc/systemd/system/gps-kiosk-setup.service << EOF
+[Unit]
+Description=GPS Kiosk Boot-time Update and Setup Check
+After=network-online.target
+Wants=network-online.target
+Before=gps-kiosk.service
+
+[Service]
+Type=oneshot
+ExecStart=$INSTALL_PATH/check-and-apply-setup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # ── systemd service ───────────────────────────────────────────────────────────
 cat > /etc/systemd/system/gps-kiosk.service << EOF
 [Unit]
 Description=GPS Kiosk Navigation System
-After=network-online.target docker.service
+After=network-online.target docker.service gps-kiosk-setup.service
 Wants=network-online.target
-Requires=docker.service
+Requires=docker.service gps-kiosk-setup.service
 
 [Service]
 Type=simple
 User=$KIOSK_USER
 WorkingDirectory=$INSTALL_PATH
-ExecStartPre=/usr/bin/git -C $INSTALL_PATH pull
 ExecStartPre=/usr/bin/docker compose -f $INSTALL_PATH/docker-compose.yml pull
 ExecStart=/usr/bin/docker compose -f $INSTALL_PATH/docker-compose.yml up --force-recreate
 ExecStop=/usr/bin/docker compose -f $INSTALL_PATH/docker-compose.yml down
@@ -119,8 +163,8 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable gps-kiosk.service
-echo "✓ GPS Kiosk systemd service enabled"
+systemctl enable gps-kiosk-setup.service gps-kiosk.service
+echo "✓ GPS Kiosk systemd services enabled"
 
 # ── Passwordless auto-login ───────────────────────────────────────────────────
 if command_exists gdm3 || [ -f /etc/gdm3/custom.conf ]; then
