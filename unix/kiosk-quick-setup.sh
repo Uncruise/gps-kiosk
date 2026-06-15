@@ -18,7 +18,7 @@ echo "============================================="
 # -----------------------------------------------------------------------------
 # 1. Install SSH
 # -----------------------------------------------------------------------------
-echo "[1/8] Installing SSH..."
+echo "[1/9] Installing SSH..."
 DEBIAN_FRONTEND=noninteractive apt update -q
 DEBIAN_FRONTEND=noninteractive apt install -y openssh-server net-tools pulseaudio-utils
 systemctl enable --now ssh
@@ -27,7 +27,7 @@ echo "      SSH installed and running on port 22."
 # -----------------------------------------------------------------------------
 # 2. Firewall
 # -----------------------------------------------------------------------------
-echo "[2/8] Configuring firewall..."
+echo "[2/9] Configuring firewall..."
 ufw --force enable
 ufw allow 22/tcp
 ufw reload
@@ -36,7 +36,7 @@ echo "      Firewall rules applied."
 # -----------------------------------------------------------------------------
 # 3. Kill and block gnome-remote-desktop
 # -----------------------------------------------------------------------------
-echo "[3/8] Blocking gnome-remote-desktop..."
+echo "[3/9] Blocking gnome-remote-desktop..."
 pkill -9 -f gnome-remote-desktop 2>/dev/null || true
 systemctl disable gnome-remote-desktop 2>/dev/null || true
 systemctl mask gnome-remote-desktop 2>/dev/null || true
@@ -62,7 +62,7 @@ echo "      gnome-remote-desktop blocked."
 # -----------------------------------------------------------------------------
 # 4. Disable Wayland + set autologin (fixes ScreenConnect black/static screen)
 # -----------------------------------------------------------------------------
-echo "[4/8] Configuring GDM..."
+echo "[4/9] Configuring GDM..."
 if grep -q "WaylandEnable" /etc/gdm3/custom.conf; then
     sed -i 's/.*WaylandEnable.*/WaylandEnable=false/' /etc/gdm3/custom.conf
 else
@@ -81,7 +81,7 @@ echo "      Wayland disabled, autologin set to $ADMIN_USER."
 # -----------------------------------------------------------------------------
 # 5. Disable sleep and screen lock
 # -----------------------------------------------------------------------------
-echo "[5/8] Disabling sleep and screen lock..."
+echo "[5/9] Disabling sleep and screen lock..."
 systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 
 mkdir -p /etc/polkit-1/localauthority/50-local.d
@@ -107,9 +107,31 @@ chown $ADMIN_USER:$ADMIN_USER /home/$ADMIN_USER/.config/autostart/disable-lock.d
 echo "      Sleep and screen lock disabled."
 
 # -----------------------------------------------------------------------------
-# 6. Mute audio
+# 6. Disable GNOME keyring prompt on autologin
 # -----------------------------------------------------------------------------
-echo "[6/8] Muting audio..."
+echo "[6/9] Configuring keyring for autologin..."
+
+# PAM module that auto-unlocks the keyring with an empty password during
+# passwordless autologin (without this, gnome-keyring fails to start and
+# cascades into SSH/PKCS11/secrets daemon errors on every login)
+DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-gnome-keyring -q 2>/dev/null || true
+
+AUTOLOGIN_PAM="/etc/pam.d/gdm-autologin"
+if [ -f "$AUTOLOGIN_PAM" ] && ! grep -q "pam_gnome_keyring" "$AUTOLOGIN_PAM"; then
+    sed -i '/^auth.*pam_permit/i auth optional pam_gnome_keyring.so' "$AUTOLOGIN_PAM"
+    sed -i '/^session.*pam_permit/i session optional pam_gnome_keyring.so auto_start' "$AUTOLOGIN_PAM"
+fi
+
+# Remove any password-protected keyring so it is recreated blank on next login
+# Safe for a kiosk — nothing sensitive lives in the keyring
+rm -f /home/$ADMIN_USER/.local/share/keyrings/login.keyring 2>/dev/null || true
+
+echo "      Keyring configured for passwordless autologin."
+
+# -----------------------------------------------------------------------------
+# 7. Mute audio
+# -----------------------------------------------------------------------------
+echo "[7/9] Muting audio..."
 sudo -u $ADMIN_USER XDG_RUNTIME_DIR=/run/user/$ADMIN_UID wpctl set-mute @DEFAULT_AUDIO_SINK@ 1 2>/dev/null || \
 sudo -u $ADMIN_USER XDG_RUNTIME_DIR=/run/user/$ADMIN_UID pactl set-sink-mute @DEFAULT_SINK@ 1 2>/dev/null || \
 echo "      [WARN] Could not mute audio — run manually after login."
@@ -118,7 +140,7 @@ echo "      Audio muted."
 # -----------------------------------------------------------------------------
 # 7. Suppress kernel update notifications
 # -----------------------------------------------------------------------------
-echo "[7/8] Suppressing kernel/update notifications..."
+echo "[8/9] Suppressing kernel/update notifications..."
 
 # needrestart: switch from interactive (i) to automatic (a) — no restart prompts
 if [ -f /etc/needrestart/needrestart.conf ]; then
@@ -146,7 +168,7 @@ echo "      Kernel/update notifications suppressed."
 # -----------------------------------------------------------------------------
 # 8. Daily restart at 3:00 AM
 # -----------------------------------------------------------------------------
-echo "[8/8] Scheduling daily 3 AM restart..."
+echo "[9/9] Scheduling daily 3 AM restart..."
 
 cat > /etc/systemd/system/kiosk-daily-restart.service << 'EOF'
 [Unit]
@@ -187,6 +209,7 @@ echo " Lock:            disabled"
 echo " Autologin:       $ADMIN_USER"
 echo " Audio:           muted"
 echo " Update popups:   suppressed"
+echo " Keyring:         auto-unlock on autologin"
 echo " Daily restart:   3:00 AM"
 echo "============================================="
 echo ""
