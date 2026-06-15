@@ -9,34 +9,29 @@ No prior Linux experience required. Follow each step in order.
 
 - A computer that will become the kiosk (minimum 4 GB RAM, 32 GB storage)
 - A USB stick (8 GB or larger) — **all data on it will be erased**
-- A separate Windows PC to prepare the USB stick
+- Any computer (Mac, Windows, or Linux) to prepare the USB stick
 - An internet connection at the kiosk machine during setup
 
 ---
 
-## Part 1 — Prepare the USB Stick (on a Windows PC)
+## Part 1 — Prepare the USB Stick
 
 ### 1.1 Download Ubuntu
 
-1. Open a web browser and go to the official Ubuntu website.
-2. Download **Ubuntu 24.04 LTS Desktop** (the file ends in `.iso`, roughly 5 GB).
+Download **Ubuntu 24.04 LTS Desktop** from the official Ubuntu website. The file ends in `.iso` and is roughly 5 GB.
 
-### 1.2 Download Rufus
+### 1.2 Download Balena Etcher
 
-1. Go to the Rufus website and download the latest version.
-2. No installation needed — it runs directly as a `.exe` file.
+Download **Balena Etcher** from `etcher.balena.io`. It runs on Mac, Windows, and Linux with no installation required.
 
 ### 1.3 Flash the USB Stick
 
 1. Plug in your USB stick.
-2. Open Rufus.
-3. Under **Device**, select your USB stick from the dropdown.
-4. Under **Boot selection**, click **SELECT** and choose the Ubuntu `.iso` file you downloaded.
-5. Leave all other settings at their defaults.
-6. Click **START**.
-7. If Rufus asks which write mode to use, select **Write in ISO Image mode** and click OK.
-8. Wait for it to complete (5–10 minutes). Click **CLOSE** when done.
-9. Safely eject the USB stick.
+2. Open Balena Etcher.
+3. Click **Flash from file** and select the Ubuntu `.iso` you downloaded.
+4. Click **Select target** and choose your USB stick.
+5. Click **Flash** and wait for it to complete (5–10 minutes).
+6. Safely eject the USB stick when done.
 
 ---
 
@@ -47,9 +42,9 @@ No prior Linux experience required. Follow each step in order.
 1. Plug the USB stick into the kiosk machine.
 2. Power the machine on.
 3. As soon as the screen lights up, press the boot menu key repeatedly.
-   - Common keys: **F12**, **F11**, **F10**, **Esc**, or **Del** — it depends on the machine.
+   - Common keys: **F12**, **F11**, **F10**, **Esc**, or **Del** — depends on the machine.
    - The screen may briefly show which key to press (e.g. "Press F12 for Boot Menu").
-4. From the boot menu, select the USB stick (it may be listed as "USB" or "UEFI USB").
+4. From the boot menu, select the USB stick (may be listed as "USB" or "UEFI USB").
 5. The Ubuntu installer will load. This may take a minute.
 
 ### 2.2 Install Ubuntu
@@ -64,9 +59,9 @@ No prior Linux experience required. Follow each step in order.
 7. Click **Next**, then **Install**.
 8. On the "Create your account" screen:
    - **Your name:** GPS Kiosk
-   - **Computer name:** gps-kiosk-01 *(or a name that identifies the machine)*
-   - **Username:** `kiosk`
-   - **Password:** *(choose any password — you will need it to run the setup script)*
+   - **Computer name:** `sfxgps`, `wndgps`, etc. — something that identifies the vessel
+   - **Username:** `gpskiosk`
+   - **Password:** choose any password — you will need it to run the setup script
    - Check **Require my password to log in**
 9. Select your time zone. Click **Next**.
 10. Review the summary and click **Install**.
@@ -80,30 +75,25 @@ No prior Linux experience required. Follow each step in order.
 
 ### 3.1 Log In
 
-1. The machine will reboot and show the login screen.
-2. Log in as **kiosk** with the password you chose during install.
+The machine will reboot and show the login screen. Log in as **gpskiosk** with the password you chose during install.
 
 ### 3.2 Connect to the Internet
 
 Make sure the machine has an active internet connection (Ethernet cable recommended for reliability).
 
-To check: look for a network icon in the top-right corner of the screen. If using Wi-Fi, click it and connect to your network.
+To check: look for a network icon in the top-right corner of the screen.
 
 ### 3.3 Open a Terminal
 
-A terminal is where you type commands. To open one:
-
-1. Press the **Windows key** (or click the grid icon in the bottom-left).
+1. Press the **Super key** (the key with the Windows logo, or the key between Ctrl and Alt).
 2. Type `terminal` and press **Enter**.
 3. A black window will open. This is the terminal.
 
 ---
 
-## Part 4 — Run the GPS Kiosk Setup Script
+## Part 4 — Run the GPS Kiosk Setup
 
-This single command installs everything and configures the machine as a kiosk. Type it carefully — or copy and paste it.
-
-### 4.1 Download the Setup Script
+### 4.1 Download the Repo
 
 In the terminal, type the following and press **Enter**:
 
@@ -111,31 +101,46 @@ In the terminal, type the following and press **Enter**:
 sudo apt-get install -y git && sudo git clone https://github.com/Uncruise/gps-kiosk.git /opt/gps-kiosk
 ```
 
-When prompted, enter the **kiosk** password you chose during Ubuntu install.
+When prompted, enter the **gpskiosk** password you chose during Ubuntu install.
 
-### 4.2 Run the Setup
+### 4.2 Run the Full Setup
 
 ```
 sudo bash /opt/gps-kiosk/unix/quick-setup.sh
 ```
 
-> This script will:
-> - Install Docker and all required software
-> - Configure the `kiosk` account to auto-login on boot (no password prompt)
-> - Download and start the GPS Kiosk navigation software into `/opt/gps-kiosk/`
-> - Configure the machine to boot directly into the kiosk display
-> - Disable screen sleep and lock screens
->
-> It will take **5–15 minutes** depending on internet speed. You will see progress messages scrolling by — this is normal.
+This will take **5–15 minutes** depending on internet speed. Progress messages will scroll by — this is normal.
 
-### 4.3 Verify the Setup
+What the script does:
+- Installs Docker
+- Downloads and starts the GPS Kiosk container
+- Configures `gpskiosk` to auto-login on boot (no password prompt)
+- Enables the systemd service so the kiosk starts on every boot
+- Sets up the browser to open full-screen automatically
 
-At the end of the script you should see lines like:
+### 4.3 Run the GNOME Kiosk Tuning
 
 ```
-✓ kiosk added to docker group
+sudo bash /opt/gps-kiosk/unix/kiosk-quick-setup.sh gpskiosk
+```
+
+This runs additional Ubuntu 24.04 GNOME tuning:
+- Installs SSH for remote access
+- Disables Wayland (required for remote desktop tools)
+- Disables sleep, screen lock, and screen blanking
+- Configures the GNOME keyring for passwordless autologin
+- Suppresses kernel update notifications
+- Schedules a daily 3 AM restart
+
+When it asks **"Reboot now? (y/n)"** — type `n`. You will reboot in the next step.
+
+### 4.4 Verify the Setup
+
+At the end of each script you should see lines like:
+
+```
 ✓ GPS Kiosk container started
-✓ GPS Kiosk systemd service enabled
+✓ GPS Kiosk systemd services enabled
 ✓ GDM3 auto-login configured
 ✓ Screen blanking disabled
 ✓ Browser autostart configured (/etc/xdg/autostart/)
@@ -145,11 +150,9 @@ If you see any errors, take a photo of the terminal and contact Morris.
 
 ---
 
-## Part 5 — Reboot and Confirm Kiosk Mode
+## Part 5 — Reboot and Confirm
 
 ### 5.1 Reboot
-
-In the terminal, type:
 
 ```
 sudo reboot
@@ -158,12 +161,10 @@ sudo reboot
 ### 5.2 What to Expect After Reboot
 
 1. The machine restarts.
-2. It automatically logs in as `kiosk` — **no password prompt will appear**.
-3. The `gps-kiosk` systemd service starts and pulls the latest image.
-4. After about 30–60 seconds, the browser opens full-screen showing the GPS navigation map.
-5. The display should show the Freeboard-SK navigation interface.
+2. It automatically logs in as `gpskiosk` — no password prompt.
+3. After 30–60 seconds, the browser opens full-screen showing the GPS navigation map.
 
-If the map appears, the installation is complete.
+If the map appears, installation is complete.
 
 ---
 
@@ -171,13 +172,13 @@ If the map appears, the installation is complete.
 
 ### The machine boots to a login screen instead of the kiosk
 
-Log in as `kiosk` and run:
+Log in as `gpskiosk` and run:
 
 ```
 sudo systemctl status gps-kiosk.service
 ```
 
-Take a photo of the output and contact Morris.
+Take a photo and contact Morris.
 
 ### The kiosk screen is blank or shows an error
 
@@ -187,22 +188,20 @@ Open a terminal (press **Ctrl + Alt + T**) and run:
 docker logs gps-kiosk
 ```
 
-Take a photo of the output and contact Morris.
+Take a photo and contact Morris.
 
 ### The script failed partway through
 
-The script is safe to run again. Re-run the same command from Step 4.2.
+Both scripts are safe to re-run. Run the same command again from Step 4.2.
 
 ### Need to access the desktop while in kiosk mode
 
-Press **Ctrl + Alt + F2** to switch to a login terminal, or press **Ctrl + Alt + T** to try opening a terminal over the kiosk window.
+Press **Ctrl + Alt + F2** to switch to a login terminal, or press **Ctrl + Alt + T** to open a terminal over the kiosk window.
 
 ---
 
 ## Account Summary
 
-There is one account on this machine:
-
 | Account | Purpose | Password |
 |---------|---------|----------|
-| `kiosk` | Runs the navigation display; auto-logs in on boot | Set during Ubuntu install (used only for sudo/setup) |
+| `gpskiosk` | Runs the navigation display; auto-logs in on boot | Set during Ubuntu install (used only for sudo/setup) |

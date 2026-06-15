@@ -1,235 +1,129 @@
-# GPS Kiosk - Unix/Linux Scripts
+# GPS Kiosk — Unix/Linux Scripts
 
-This directory contains Unix/Linux shell script versions of all the Windows PowerShell and batch scripts for the GPS Kiosk project.
+Shell scripts for setting up and managing the GPS Kiosk on Ubuntu/Debian and other Linux systems.
 
-## Quick Start
+## Setup Scripts
 
-Run **one command** on any supported Linux machine and walk away — the system reboots
-into a full-screen GPS Kiosk with no login prompt:
+| Script | Purpose |
+|--------|---------|
+| `quick-setup.sh` | Full setup: installs Docker, clones repo, starts container, configures autologin and systemd services. Run once, then reboot. |
+| `kiosk-quick-setup.sh` | Ubuntu 24.04 GNOME tuning: SSH, Wayland disable, sleep/lock off, keyring fix, update suppression, daily restart. Run after `quick-setup.sh`. |
+| `download-setup.sh` | Same as `quick-setup.sh` but downloads the repo as a zip — use on machines without Git. |
+
+### First-time setup
 
 ```bash
-sudo bash unix/quick-setup.sh
+sudo bash /opt/gps-kiosk/unix/quick-setup.sh
+sudo bash /opt/gps-kiosk/unix/kiosk-quick-setup.sh gpskiosk
+sudo reboot
 ```
 
-The script uses the account that ran `sudo` as the single kiosk account. It configures
-auto-login for that user, installs Docker, starts the GPS Kiosk container, and launches
-the browser in kiosk mode on every boot. All files are written to `/opt/` and `/etc/` —
-no user home folders are used.
+### Re-bootstrap an existing machine
 
-For a machine without Git installed:
+If a machine was deployed before the `gps-kiosk-setup.service` auto-updater existed:
 
 ```bash
-cd unix
-sudo bash download-setup.sh
+sudo bash /opt/gps-kiosk/unix/quick-setup.sh
 ```
 
-## Script Descriptions
+After that, future changes to `kiosk-quick-setup.sh` are applied automatically on reboot.
 
-### Setup Scripts
+---
 
-- **quick-setup.sh** - **All-in-one setup**: creates the `kiosk` user (no password), installs Docker, clones the repo, starts the container, configures passwordless auto-login (GDM3/LightDM), enables the systemd service, disables screen blanking, and sets up the browser kiosk autostart. Run once; reboot into kiosk.
-- **download-setup.sh** - Downloads GPS Kiosk from GitHub without requiring Git installation
-- **configure-auto-login.sh** - Standalone script to configure auto-login if needed separately
-- **configure-gps-kiosk.sh** - Configure GPS data source and map settings
+## Configuration Scripts
 
-### Diagnostic Scripts
-
-- **docker-diagnostic.sh** - Diagnose Docker installation and runtime issues
-- **diagnose-deployment.sh** - Check deployment status and troubleshoot startup problems
-- **verify-update.sh** - Verify auto-update functionality is working correctly
-
-### Utility Scripts
-
-- **add-com2tcp-support.sh** - Add COM2TCP serial bridge support (for SVO-GPS systems)
-- **test-restart.sh** - Test restart sequence without rebooting
-- **update-fleet.sh** - Remotely update multiple GPS Kiosk deployments via SSH
-- **build-intune-packages.sh** - Create deployment packages for distribution
-
-## Requirements
-
-### Minimum Requirements
-
-- Docker Engine or Docker Desktop
-- Bash shell
-- One of: Debian/Ubuntu, RHEL/CentOS/Fedora, or Arch Linux
-- Internet connection (for initial setup)
-
-### Optional Requirements
-
-- Git (recommended, but download-setup.sh works without it)
-- jq (for configure-gps-kiosk.sh to work)
-- systemd (for auto-start on boot)
-- X11 or Wayland display server (for kiosk mode browser)
-
-## Installation Paths
-
-By default, scripts install to:
-
-- **Root installation**: `/opt/gps-kiosk` (when run with sudo)
-- **User installation**: `~/gps-kiosk` or current directory (when run as regular user)
-
-## Auto-Start Configuration
-
-Auto-login, the systemd service, and browser kiosk launch are all configured automatically
-by `quick-setup.sh`. After running it, the machine boots directly into the kiosk display
-with no login prompt.
-
-The setup creates (everything in `/opt/` and `/etc/` — no user home folders):
-- GDM3 or LightDM auto-login for the account that ran `sudo`
-- `gps-kiosk.service` systemd unit (`/etc/systemd/system/`) — enabled at boot
-- `/opt/gps-kiosk/launch-browser.sh` — waits for Signal K, then opens browser in `--kiosk` mode
-- `/etc/xdg/autostart/gps-kiosk-browser.desktop` — system-wide autostart, triggers the browser on desktop login
-- `/etc/X11/xorg.conf.d/10-kiosk.conf` — disables screen blanking
-
-## Manual Service Control
+| Script | Purpose |
+|--------|---------|
+| `configure-auto-login.sh` | Standalone autologin config (GDM3/LightDM) |
+| `configure-gps-kiosk.sh` | Configure GPS data source and map settings |
 
 ```bash
-# Start GPS Kiosk service
-sudo systemctl start gps-kiosk.service
+# Change NMEA data source
+./configure-gps-kiosk.sh --gps-host 192.168.1.100 --gps-port 10110
 
-# Stop GPS Kiosk service
-sudo systemctl stop gps-kiosk.service
+# Change default map center
+./configure-gps-kiosk.sh --map-lat 27.7634 --map-lon -6.8447 --map-zoom 15
+```
 
-# View service status
+---
+
+## Diagnostic Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `docker-diagnostic.sh` | Diagnose Docker issues; `--fix` to auto-repair |
+| `diagnose-deployment.sh` | Check deployment status and startup problems |
+| `verify-update.sh` | Confirm auto-update is working |
+
+```bash
+bash unix/docker-diagnostic.sh --fix
+bash unix/diagnose-deployment.sh
+bash unix/verify-update.sh
+```
+
+---
+
+## Service Control
+
+```bash
 sudo systemctl status gps-kiosk.service
-
-# View service logs
+sudo systemctl status gps-kiosk-setup.service
 sudo journalctl -u gps-kiosk.service -f
+sudo journalctl -t gps-kiosk-setup -f    # setup checker logs
 ```
+
+---
 
 ## Docker Commands
 
 ```bash
-# Start containers
-docker compose up -d
-
-# Stop containers
-docker compose down
-
-# View logs
+docker compose pull && docker compose up -d
 docker logs -f gps-kiosk
-
-# Restart containers
 docker compose restart
-
-# Pull latest images
-docker compose pull
 ```
 
-## Configuration
-
-### GPS Data Source
-
-Configure the GPS data source (TCP/IP, serial port, etc.):
-
-```bash
-./configure-gps-kiosk.sh --gps-host 192.168.1.100 --gps-port 10110
-```
-
-### Map Settings
-
-Configure default map center and zoom level:
-
-```bash
-./configure-gps-kiosk.sh --map-lat 27.7634 --map-lon -6.8447 --map-zoom 15
-```
-
-### View Current Configuration
-
-```bash
-./configure-gps-kiosk.sh --show-current
-```
-
-## Troubleshooting
-
-### Docker Issues
-
-Run the diagnostic script:
-
-```bash
-./docker-diagnostic.sh
-```
-
-To automatically fix common issues:
-
-```bash
-./docker-diagnostic.sh --fix
-```
-
-### Deployment Issues
-
-Check deployment status:
-
-```bash
-./diagnose-deployment.sh
-```
-
-### Permission Issues
-
-Add your user to the docker group:
-
-```bash
-sudo usermod -aG docker $USER
-```
-
-Then log out and back in.
-
-### Service Won't Start
-
-Check service logs:
-
-```bash
-sudo journalctl -u gps-kiosk.service -n 50
-```
-
-Check Docker logs:
-
-```bash
-docker logs gps-kiosk
-```
+---
 
 ## Fleet Management
 
-To update multiple GPS Kiosk systems remotely:
+Update multiple kiosks remotely over SSH:
 
 ```bash
-./update-fleet.sh --computers host1,host2,host3 --user admin --key ~/.ssh/id_rsa
+bash unix/update-fleet.sh --computers host1,host2,host3 --user gpskiosk --key ~/.ssh/id_rsa
+bash unix/verify-update.sh
 ```
 
-After updating, verify each system:
+---
+
+## Serial Port Bridging
+
+For instruments connected via a serial (RS-232) adapter instead of direct TCP:
 
 ```bash
-./verify-update.sh
+bash unix/add-com2tcp-support.sh
 ```
 
-## Differences from Windows Scripts
+Serial ports on Linux: `/dev/ttyS0`, `/dev/ttyS1`, `/dev/ttyUSB0`, etc.
 
-1. **Docker Desktop vs Docker Engine**: Linux scripts work with Docker Engine (native) or Docker Desktop
-2. **Display Managers**: Supports GDM3 and LightDM for auto-login (vs Windows auto-login)
-3. **Systemd Services**: Uses systemd instead of Windows Task Scheduler
-4. **Browsers**: Supports Chromium, Chrome, and Firefox in kiosk mode (vs Microsoft Edge)
-5. **Serial Ports**: Uses `/dev/ttyS*` instead of `COM*` ports
-6. **Package Managers**: Auto-detects apt, yum, or pacman for installing dependencies
+---
+
+## How Auto-Updates Work
+
+On every reboot:
+
+1. `gps-kiosk-setup.service` runs as root
+2. It does `git pull` on `/opt/gps-kiosk`
+3. It compares the sha256 of `unix/kiosk-quick-setup.sh` to `/var/lib/gps-kiosk/setup.hash`
+4. If the hash changed, it re-runs `kiosk-quick-setup.sh` automatically and updates the stored hash
+5. `gps-kiosk.service` then pulls the latest Docker image and starts the container
+
+To watch it run: `sudo journalctl -t gps-kiosk-setup -f`
+
+---
 
 ## Supported Distributions
 
-Tested on:
-
 - Ubuntu 20.04, 22.04, 24.04
 - Debian 11, 12
-- CentOS Stream 8, 9
-- Fedora 38, 39
-- Arch Linux (current)
 - Raspberry Pi OS (Bullseye, Bookworm)
-
-## Getting Help
-
-1. Check the main README.md in the project root
-2. Run diagnostic scripts to identify issues
-3. Check Docker logs: `docker logs gps-kiosk`
-4. Check service logs: `sudo journalctl -u gps-kiosk.service`
-5. Visit the project repository: <https://github.com/Uncruise/gps-kiosk>
-
-## License
-
-Same as the main GPS Kiosk project.
+- CentOS Stream 8, 9 / Fedora 38, 39 (Docker setup only; GNOME tuning is Ubuntu-specific)

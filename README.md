@@ -1,241 +1,146 @@
-# GPS Kiosk - Marine Navigation System
+# GPS Kiosk — Marine Navigation System
 
-A containerized marine navigation kiosk built on Signal K technology, designed for easy deployment and automatic updates.
+A containerized marine navigation kiosk built on Signal K technology. Runs Signal K Server + Freeboard-SK in Docker, auto-updates on every restart, and launches a browser in full-screen kiosk mode.
 
-## 🚀 Quick Start
-
-### For Windows Users
-
-1. **Download and run**: `Windows/setup.bat`
-2. **Done!** The system will auto-install Docker, pull latest images, and launch in kiosk mode
-
-### For Linux/Unix Users
-
-1. **Run setup**: `sudo bash unix/quick-setup.sh`
-   - Creates a `kiosk` account (no password), configures auto-login, starts the container, and launches the browser in kiosk mode on every boot.
-2. **No Git installed?**: `sudo bash unix/download-setup.sh`
-
-### For IT Deployment
-
-1. **Intune Packages**: Use files in `intune_out/` folder (Windows only)
-2. **Direct Download**: Use `Windows/download.bat` (Windows) or `unix/download.sh` (Linux) for non-Git environments
-
-## 🎯 What It Does
-
-- **Marine Navigation Display**: Real-time GPS, wind, and marine instrument data
-- **Signal K Server**: Open-source marine data platform
-- **Freeboard Interface**: Touch-friendly navigation charts
-- **Auto-Updates**: Pulls latest Docker images and configurations
-- **Kiosk Mode**: Full-screen Edge browser for dedicated displays
-
-## 📋 Features
-
-- ✅ **Auto-installs Docker Desktop** if missing
-- ✅ **Auto-pulls latest images** from Docker Hub (`morrisuca/gps-kiosk:latest`)
-- ✅ **Auto-starts on boot** with Windows startup integration
-- ✅ **Self-updating configuration** from GitHub
-- ✅ **Enterprise deployment** via Microsoft Intune
-- ✅ **Marine chart integration** (OpenStreetMap + OpenSeaMap)
-- ✅ **NMEA data support** via TCP connections
-- ✅ **Touch-friendly interface** optimized for marine environments
-
-## 🏗️ Architecture
-
-```
-GPS Kiosk System
-├── Docker Container (morrisuca/gps-kiosk:latest)
-│   ├── Signal K Server (Node.js)
-│   ├── Freeboard-SK Interface
-│   └── Marine Data Processing
-├── Volume Mount (./Volume)
-│   ├── Configuration Files
-│   ├── User Settings
-│   └── Chart Data
-└── Auto-Startup Scripts
-    ├── Docker Management
-    ├── Health Monitoring
-    └── Browser Launch
-```
-
-## 📁 Project Structure
-
-```
-gps-kiosk/
-├── Windows/                   # Windows scripts and tools
-│   ├── setup.bat              # Simple setup for end users
-│   ├── quick-setup.ps1        # Advanced PowerShell setup
-│   ├── download.bat           # Git-free download setup
-│   ├── download-setup.ps1     # PowerShell download script
-│   ├── configure-*.ps1        # Configuration scripts
-│   ├── docker-diagnostic.ps1  # Diagnostic tools
-│   └── README.md              # Windows-specific documentation
-├── unix/                      # Linux/Unix scripts
-│   ├── setup.sh              # Interactive setup wrapper
-│   ├── quick-setup.sh        # Advanced shell setup
-│   ├── download.sh           # Git-free download setup
-│   ├── download-setup.sh     # Shell download script
-│   ├── configure-*.sh        # Configuration scripts
-│   ├── docker-diagnostic.sh  # Diagnostic tools
-│   └── README.md             # Unix-specific documentation
-├── docker-compose.yml         # Container configuration
-├── Dockerfile                 # Custom image build
-├── startup.sh                 # Container startup script
-├── Volume/                    # Signal K configuration
-│   ├── settings.json         # Server settings
-│   ├── security.json         # Security configuration
-│   └── applicationData/      # User data and plugins
-├── intune/                   # Microsoft Intune deployment
-│   ├── install.ps1          # Intune installation script
-│   ├── detection.ps1        # Intune detection script
-│   └── gps-kiosk-launcher.bat # Intune entry point
-├── docker-intune/           # Docker-only Intune package
-└── intune_out/              # Built Intune packages
-    ├── gps-kiosk-launcher.intunewin
-    └── docker-installer.intunewin
-```
-
-## 🔧 Configuration
-
-### NMEA Data Source
-
-Edit `Volume/settings.json` to configure your marine data source:
-
-```json
-{
-  "pipedProviders": [
-    {
-      "pipeElements": [
-        {
-          "type": "providers/simple",
-          "options": {
-            "type": "NMEA0183",
-            "subOptions": {
-              "type": "tcp",
-              "host": "YOUR_DEVICE_IP",
-              "port": "23"
-            }
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Chart Configuration
-
-Charts are configured in the Freeboard interface:
-
-- **OpenStreetMap**: Base mapping
-- **OpenSeaMap**: Marine-specific overlay
-- **Custom Charts**: S-57 ENC support available
-
-## 🚀 Deployment Options
-
-### 1. Manual Installation (Windows)
-
-```powershell
-# Clone repository
-git clone https://github.com/Uncruise/gps-kiosk.git
-cd gps-kiosk\Windows
-
-# Run setup
-.\setup.bat
-```
-
-### 2. Manual Installation (Linux/Unix)
-
-```bash
-# Clone repository
-sudo git clone https://github.com/Uncruise/gps-kiosk.git /opt/gps-kiosk
-
-# Run setup — creates 'kiosk' user (no password), auto-login, container, and browser kiosk
-sudo bash /opt/gps-kiosk/unix/quick-setup.sh
-
-# Reboot into kiosk mode
-sudo reboot
-```
-
-### 3. Direct Download (No Git Required)
-
-**Windows:**
-
-```powershell
-.\windows\download.bat
-```
-
-**Linux/Unix:**
-
-```bash
-sudo bash unix/download.sh
-```
-
-**Windows:**
-
-```powershell
-# Or manually
-docker compose pull
-docker compose up -d
-```
-
-**Linux/Unix:**
-```bash2. Configure detection rule with `detection.ps1`
-3. Deploy to device groups
-
-## 🔄 Updates
-
-The system automatically updates on every restart:
-
-- **Docker Images**: Pulls latest from Docker Hub
-- **Configuration**: Syncs from GitHub repository
-- **Dependencies**: Auto-managed by container
-
-### Manual Update
-
-```bash
-# Run the update script
-./update-gps-kiosk.bat
-
-# Or manually
-docker compose pull
-docker compose up -d
-```
-
-## 🛠️ Development
-
-### Building Custom Images
-
-```bash
-# Build locally
-docker build -t gps-kiosk .
-
-# Run with custom image
-docker compose up -d
-```
-
-### Modifying Configuration
-
-1. Edit files in `Volume/` directory
-2. Restart containers: `docker compose restart`
-3. Changes persist across updates
-
-## 🌐 Access
-
-- **Primary Interface**: <http://localhost:3000/@signalk/freeboard-sk/?zoom=12&northup=1&movemap=1&kiosk=1>
-- **Signal K API**: <http://localhost:3000/signalk/>
-- **Admin Panel**: <http://localhost:3000/admin/>
-- **Freeboard-SK Kiosk Mode**: <http://localhost:3000/@signalk/freeboard-sk/?zoom=12&northup=1&movemap=1&kiosk=1>
-
-## 📞 Support
-
-- **Repository**: <https://github.com/Uncruise/gps-kiosk>
-- **Signal K Documentation**: <https://signalk.org/>
-- **Freeboard Documentation**: <https://github.com/SignalK/freeboard-sk>
-
-## 📄 License
-
-Apache-2.0 License - See Signal K project for details.
+Docker Hub image: `morrisuca/gps-kiosk:latest`
 
 ---
 
-**Built for maritime professionals who need reliable, updateable navigation displays.**
+## Installing on a New Machine
+
+Assumes Ubuntu 24.04 is already installed and you are logged in as `gpskiosk`.
+
+### Step 1 — Clone the repo
+
+```bash
+sudo apt-get install -y git
+sudo git clone https://github.com/Uncruise/gps-kiosk.git /opt/gps-kiosk
+```
+
+### Step 2 — Run the full setup
+
+```bash
+sudo bash /opt/gps-kiosk/unix/quick-setup.sh
+```
+
+Installs Docker, pulls the container image, configures autologin, and registers the systemd services. Takes 5–15 minutes.
+
+### Step 3 — Run the GNOME kiosk tuning
+
+```bash
+sudo bash /opt/gps-kiosk/unix/kiosk-quick-setup.sh gpskiosk
+```
+
+Configures Ubuntu 24.04 GNOME for unattended kiosk operation: disables Wayland, enables SSH, disables sleep/lock, fixes keyring autologin, suppresses update popups, and schedules a daily 3 AM restart.
+
+When prompted **"Reboot now? (y/n)"** — type `n`.
+
+### Step 4 — Reboot
+
+```bash
+sudo reboot
+```
+
+After reboot the machine logs in as `gpskiosk` automatically and the navigation display opens full-screen within 30–60 seconds.
+
+---
+
+## Verifying the Install
+
+```bash
+sudo systemctl status gps-kiosk.service       # should be active
+sudo systemctl status gps-kiosk-setup.service # should be active
+docker ps                                      # gps-kiosk container running
+curl -sf http://localhost:3000/signalk/        # returns JSON
+```
+
+---
+
+## Re-bootstrapping an Existing Machine
+
+For machines deployed before the auto-update checker (`gps-kiosk-setup.service`) was added, run `quick-setup.sh` once to install it. After that, future changes to `kiosk-quick-setup.sh` apply automatically on reboot.
+
+```bash
+sudo bash /opt/gps-kiosk/unix/quick-setup.sh
+```
+
+To check if a machine needs re-bootstrapping:
+
+```bash
+systemctl status gps-kiosk-setup.service
+# "could not be found" → run quick-setup.sh
+# "active" or "inactive" → already bootstrapped
+```
+
+---
+
+## How Auto-Updates Work
+
+On every reboot:
+
+1. `gps-kiosk-setup.service` (root) runs `git pull` on `/opt/gps-kiosk`
+2. If `unix/kiosk-quick-setup.sh` changed, it re-runs automatically and updates the stored hash
+3. `gps-kiosk.service` pulls the latest Docker image and starts the container
+4. Inside the container, `startup.sh` clones the repo and overwrites `Volume/` from GitHub
+
+**Push a change to `Volume/` or `unix/kiosk-quick-setup.sh` → deployed on next reboot with no manual steps.**
+
+Watch it run: `sudo journalctl -t gps-kiosk-setup -f`
+
+---
+
+## Common Commands
+
+```bash
+# Container
+docker compose pull && docker compose up -d
+docker logs -f gps-kiosk
+docker inspect gps-kiosk --format='{{.State.Health.Status}}'
+
+# Services
+sudo systemctl status gps-kiosk.service
+sudo journalctl -u gps-kiosk.service -f
+sudo journalctl -t gps-kiosk-setup -f
+```
+
+---
+
+## Configuration
+
+### NMEA Data Sources
+
+Edit `Volume/settings.json` to add or change instrument TCP connections. Each `pipedProviders` entry is an NMEA 0183 TCP stream. Push to GitHub — takes effect on next container restart.
+
+### Dashboard Layout
+
+Edit `Volume/applicationData/users/admin/freeboard/1.0.0.json` for map center, zoom, and chart layers.
+
+---
+
+## Web Interfaces
+
+| Interface | URL |
+|-----------|-----|
+| Navigation (kiosk) | `http://localhost:3000/@signalk/freeboard-sk/?zoom=12&northup=1&movemap=1&kiosk=1` |
+| Signal K API | `http://localhost:3000/signalk/` |
+| Admin panel | `http://localhost:3000/admin/` |
+
+---
+
+## Fleet Management
+
+Update multiple machines remotely over SSH:
+
+```bash
+bash unix/update-fleet.sh --computers host1,host2,host3 --user gpskiosk --key ~/.ssh/id_rsa
+bash unix/verify-update.sh
+```
+
+---
+
+## Building the Docker Image
+
+```bash
+docker build -t morrisuca/gps-kiosk:latest .
+docker push morrisuca/gps-kiosk:latest
+```

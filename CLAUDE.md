@@ -26,30 +26,37 @@ docker build -t morrisuca/gps-kiosk:latest .
 docker push morrisuca/gps-kiosk:latest
 ```
 
-### Windows setup (from repo root)
-```powershell
-.\Windows\setup.bat                          # Interactive setup
-.\Windows\quick-setup.ps1                   # Fully automated
-.\Windows\configure-auto-login.ps1 -Username "user" -Password "pass"
-.\Windows\docker-diagnostic.ps1 -Fix        # Diagnose and repair Docker
-.\Windows\verify-update.ps1                 # Confirm auto-updates work
-```
-
-### Unix/Linux setup
+### Setup (from repo root)
 ```bash
-sudo bash unix/quick-setup.sh               # Fully automated
-sudo bash unix/configure-auto-login.sh --username gps --password pass
-bash unix/docker-diagnostic.sh --fix
+sudo bash unix/quick-setup.sh                           # Full setup / re-bootstrap
+sudo bash unix/kiosk-quick-setup.sh <user>              # Ubuntu 24.04 GNOME tuning
+sudo bash unix/docker-diagnostic.sh --fix               # Diagnose and repair Docker
+sudo bash unix/verify-update.sh                         # Confirm auto-updates work
 sudo systemctl status gps-kiosk.service
 sudo journalctl -u gps-kiosk.service -f
+sudo journalctl -t gps-kiosk-setup -f                  # Watch setup checker on boot
 ```
 
 ## Architecture
 
 ### Auto-update mechanism
-`startup.sh` (container entrypoint) clones the GitHub repo on every container start, then **clears `/home/node/.signalk` and replaces it** with `Volume/` from the repo. Since `./Volume` is mounted into the container at that path, this also overwrites the local `./Volume` directory on the host. **Local-only changes to `./Volume` are lost on container restart — always push changes to GitHub first.**
+On every reboot, two systemd services run in sequence:
 
-The backup of the pre-restart config is stored at `/tmp/config-backup` inside the container (ephemeral).
+1. **`gps-kiosk-setup.service`** (root) — runs `/opt/gps-kiosk/check-and-apply-setup.sh`:
+   - `git pull` on `/opt/gps-kiosk`
+   - Compares sha256 of `unix/kiosk-quick-setup.sh` to `/var/lib/gps-kiosk/setup.hash`
+   - If hash changed, re-runs `kiosk-quick-setup.sh` automatically and updates the stored hash
+2. **`gps-kiosk.service`** (kiosk user) — runs after the setup service:
+   - `docker compose pull` then `docker compose up --force-recreate`
+
+Inside the container, `startup.sh` clones the repo and **clears and replaces** `/home/node/.signalk` (which is the `./Volume` mount) with `Volume/` from GitHub. **Local-only edits to `./Volume` are overwritten on container restart — always push to GitHub first.**
+
+### Bootstrapping existing machines
+Machines set up before `gps-kiosk-setup.service` was added only have the old `gps-kiosk.service`. They need a one-time manual run of `quick-setup.sh` to install the setup checker. Check with:
+```bash
+systemctl status gps-kiosk-setup.service
+# "could not be found" → needs quick-setup.sh run
+```
 
 ### Configuration persistence
 `./Volume` is mounted to `/home/node/.signalk` in the container. This directory is the Signal K server's data directory and contains:
@@ -65,7 +72,7 @@ Each entry in `pipedProviders` connects to a vessel or sensor via TCP on port 23
 - `WAV` — Wave (172.16.5.202)
 - `WIL` — Wilderness vessel (192.168.5.26)
 - `SFX` — Safari Explorer vessel (192.168.20.146)
-- `SVO` — TCP server listener (tcpserver, no host — accepts inbound connections on port 10110)
+- `SVO` — TCP server listener (tcpserver, no host — accepts inbound on port 10110)
 
 ### Ports
 - `3000` — Signal K server / Freeboard-SK web UI
@@ -77,13 +84,17 @@ Each entry in `pipedProviders` connects to a vessel or sensor via TCP on port 23
 - Signal K API: `http://localhost:3000/signalk/`
 - Admin panel: `http://localhost:3000/admin/`
 
-### Cross-platform scripts
-`Windows/` and `unix/` contain equivalent scripts for all operations. `WINDOWS-UNIX-MAPPING.md` documents the correspondence. Windows uses PowerShell + Windows Task Scheduler + Registry (auto-login) + Microsoft Edge kiosk mode + `tools/com2tcp.exe` for COM-to-TCP bridging. Unix uses Bash + systemd + display manager config (GDM3/LightDM) + Chromium/Firefox.
+### GNOME kiosk tuning (`unix/kiosk-quick-setup.sh`)
+Run once after `quick-setup.sh` on Ubuntu 24.04 machines. Handles:
+- SSH install and firewall
+- Blocks gnome-remote-desktop (conflicts with ScreenConnect)
+- Disables Wayland (`WaylandEnable=false` in GDM config — required for ScreenConnect)
+- Disables sleep, screen lock, screen blanking
+- Configures GNOME keyring for passwordless autologin (fixes cascade of PKCS11/secrets/SSH agent errors)
+- Suppresses `needrestart` kernel update prompts and apt background timers
+- Installs a systemd timer for daily 3 AM reboot
 
-Note: `unix/startup.sh` is the kiosk browser launcher (runs on the host OS to open the browser), which is separate from the container's `startup.sh` (the Signal K container entrypoint).
-
-### Enterprise deployment
-`intune/` contains install/detect/uninstall scripts for Microsoft Intune deployments that include Git and clone the repo. `docker-intune/` is a leaner variant that only installs Docker (no Git), suitable for machines that don't need Git. `tools/IntuneWinAppUtil.exe` is used to rebuild `.intunewin` packages; pre-built packages live in `intune_out/`.
+After bootstrap, changes to this script are automatically re-applied on next reboot by `gps-kiosk-setup.service`.
 
 ### NMEA data flow
 Physical GPS/wind devices → TCP connection → Signal K Server (NMEA parsing) → Signal K normalized data → Freeboard-SK web UI → kiosk browser
@@ -95,5 +106,7 @@ Physical GPS/wind devices → TCP connection → Signal K Server (NMEA parsing) 
 | `docker-compose.yml` | Service definition; `pull_policy: always` drives auto-updates |
 | `Dockerfile` | Extends `signalk/signalk-server:latest`, installs git, copies `startup.sh` |
 | `startup.sh` | Container entrypoint — clears config, syncs from GitHub, then starts Signal K |
+| `unix/quick-setup.sh` | Full host setup: Docker, systemd services, autologin, browser launcher |
+| `unix/kiosk-quick-setup.sh` | Ubuntu 24.04 GNOME tuning applied on first run and on every change via boot checker |
 | `Volume/settings.json` | NMEA provider config — edit to add/remove vessel TCP connections |
 | `Volume/security.json` | Auth tokens and admin password hash |
