@@ -174,6 +174,7 @@ if command_exists gdm3 || [ -f /etc/gdm3/custom.conf ]; then
 [daemon]
 AutomaticLoginEnable=true
 AutomaticLogin=$KIOSK_USER
+WaylandEnable=false
 
 [security]
 
