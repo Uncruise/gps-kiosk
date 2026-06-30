@@ -4,7 +4,8 @@
       "Bash(git add:*)",
       "Bash(git rm:*)",
       "Bash(git config:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "PowerShell(Get-ChildItem \"C:\\\\repo\\\\gps-kiosk\" -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object -ExpandProperty FullName | Sort-Object)"
     ]
   }
 }
